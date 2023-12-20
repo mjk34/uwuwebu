@@ -63,19 +63,38 @@
 }
 .info {
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
   background-color: #4cc9f0;
   width: 100%;
   height: 500px;
+  gap: 19px;
 }
 .info:nth-child(even) {
   background-color: #4361ee;
 }
 .image-left {
-  width: 550px;
+  width: 500px;
   height: 100%;
-  background-image: url(1326600.png);
+  background-image: url(1315995.jpeg);
   background-size: cover;
   background-position: center;
-  box-shadow: 0 0 24px 24px #4cc9f0 inset;
+  box-shadow: 0 0 30px 30px #4cc9f0 inset;
+  position: relative;
+  right: 50px;
+}
+.textbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 500px;
+}
+.image-right {
+  width: 500px;
+  height: 100%;
+  background-image: url(1315998.jpeg);
+  background-size: cover;
+  background-position: right;
+  box-shadow: 0 0 30px 30px #4361ee inset;
+  position: relative;
+  left: 50px;
 }
