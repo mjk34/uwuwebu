@@ -90,10 +90,9 @@ export default function SideMenu() {
             <div key={item.href} className="flex flex-col gap-0.5">
               <DecryptLink
                 label={item.label}
-                href={item.href}
+                as="button"
                 tickSfx={item.sfx}
                 className="inline-block text-left text-4xl font-black uppercase tracking-tight text-fg transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
-                onClick={() => menuStore.setOpen(false)}
               />
               <span className="pl-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-dim">
                 {item.desc}

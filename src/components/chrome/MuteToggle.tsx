@@ -7,7 +7,7 @@ export default function MuteToggle() {
   const muted = useSubscribedValue(
     () => isMuted(),
     ["uwuversity:mute-change"],
-    true,
+    false,
   );
 
   const toggle = () => {

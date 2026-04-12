@@ -1,6 +1,8 @@
 import type { MockGameDemo } from "@/lib/mock";
 import DecryptLink from "@/components/chrome/DecryptLink";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 type DemoCardProps = {
   demo: MockGameDemo;
 };
@@ -14,7 +16,7 @@ export default function DemoCard({ demo }: DemoCardProps) {
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-bg-deep md:aspect-auto md:h-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={demo.heroSrc}
+          src={`${basePath}${demo.heroSrc}`}
           alt={`${demo.title} key art`}
           className="h-full w-full object-cover"
         />
