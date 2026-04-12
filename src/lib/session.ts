@@ -71,7 +71,7 @@ export function setMockSession(on: boolean): void {
 
 export function isMuted(): boolean {
   const raw = readLocal(LocalKeys.muted);
-  if (raw === null) return true; // default muted
+  if (raw === null) return false; // default unmuted
   return raw === "1";
 }
 

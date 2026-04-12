@@ -40,6 +40,12 @@ export default function TerminalBootLines({
       return;
     }
 
+    done.current = false;
+    lineIdx.current = 0;
+    charIdx.current = 0;
+    setPrinted([]);
+    setCurrent("");
+
     let timer: number | null = null;
     const tick = () => {
       if (done.current) return;
