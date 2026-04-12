@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { scrambleStep } from "@/lib/decrypt";
 import { playSfx } from "@/lib/sfx";
+import { menuStore } from "@/lib/menu-store";
 
 const DEFAULT_TEXT = "UwUVERSITY";
 const HOVER_TEXT = "ENROLL. GRIND. ASCEND.";
@@ -53,6 +54,7 @@ export default function HeroSection() {
 
   const handleEnter = () => {
     if (hovered) return;
+    if (menuStore.getOpen()) return;
     setHovered(true);
     runScramble(HOVER_TEXT);
   };
@@ -69,9 +71,8 @@ export default function HeroSection() {
     >
       <h1
         onMouseEnter={handleEnter}
-        onPointerMove={handleEnter}
         onMouseLeave={handleLeave}
-        className="max-w-5xl cursor-default font-mono text-4xl font-black uppercase leading-[0.95] tracking-tight tabular-nums sm:text-5xl lg:text-7xl"
+        className="w-fit cursor-default font-mono text-4xl font-black uppercase leading-[0.95] tracking-tight tabular-nums sm:text-5xl lg:text-7xl"
       >
         {hovered ? (
           <>

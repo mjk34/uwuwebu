@@ -10,26 +10,27 @@ type HackerModalProps = {
 };
 
 const BOOT_LINES = [
-  "[boot] UwUversity net-init v0.1.0",
-  "[boot] loading kernel modules........ ok",
-  "[net]  probing uplink :4875 ................ ok",
-  "[auth] negotiating discord handshake ........",
-  "[auth] waiting on local oracle ..............",
-  "[ok]   all systems nominal. awaiting operator.",
+  "$ curl -s uwuversity://uplink/handshake | jq .",
+  '{ "status": "ready", "node": "professor-rs:4875" }',
+  "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local",
+  "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y",
+  "$ sudo ./enroll --provider=discord --scope=full",
+  "[pid 6769] spawning auth daemon.............. ok",
+  "awaiting operator >>>",
 ];
 
 const CTA_TEXT = "> ./auth/discord --connect";
 
+let hasPlayedBoot = false;
+
 export default function HackerModal({ onClose }: HackerModalProps) {
-  const [bootDone, setBootDone] = useState(false);
+  const [bootDone, setBootDone] = useState(hasPlayedBoot);
   const ctaRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const openedSfxFired = useRef(false);
 
+  // Mark as seen so closing early still skips next time
   useEffect(() => {
-    if (openedSfxFired.current) return;
-    openedSfxFired.current = true;
-    playSfx("modal-open");
+    hasPlayedBoot = true;
   }, []);
 
   useEffect(() => {
@@ -67,7 +68,14 @@ export default function HackerModal({ onClose }: HackerModalProps) {
   useEffect(() => {
     if (!bootDone) return;
     const t = window.setTimeout(() => ctaRef.current?.focus(), 50);
-    return () => window.clearTimeout(t);
+    // Play sound in sync with cursor blink (1s interval, sound on appear)
+    const blinkId = window.setInterval(() => {
+      playSfx("cursor-blink");
+    }, 1000);
+    return () => {
+      window.clearTimeout(t);
+      window.clearInterval(blinkId);
+    };
   }, [bootDone]);
 
   const handleDone = () => {
@@ -109,6 +117,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
           <TerminalBootLines
             lines={BOOT_LINES}
             onDone={handleDone}
+            instant={hasPlayedBoot}
           />
           {bootDone && (
             <button
@@ -120,7 +129,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
               <span>{CTA_TEXT}</span>
               <span
                 aria-hidden="true"
-                className="ml-1 inline-block h-[1em] w-[0.5em] translate-y-[2px] animate-pulse bg-bg-deep align-middle"
+                className="ml-1 inline-block h-[0.85em] w-[0.5em] -translate-y-[1px] animate-[cursor-blink_1s_step-end_infinite] bg-bg-deep align-middle"
               />
             </button>
           )}

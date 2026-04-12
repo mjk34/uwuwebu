@@ -13,8 +13,8 @@ type TerminalBootLinesProps = {
 
 export default function TerminalBootLines({
   lines,
-  charMs = 22,
-  linePauseMs = 180,
+  charMs = 7,
+  linePauseMs = 60,
   onDone,
   instant = false,
 }: TerminalBootLinesProps) {
@@ -61,7 +61,7 @@ export default function TerminalBootLines({
         const nextChar = target[ci];
         setCurrent(target.slice(0, ci + 1));
         charIdx.current = ci + 1;
-        if (nextChar !== " ") playSfx("type");
+        if (nextChar !== " " && ci % 3 === 0) playSfx("type");
         timer = window.setTimeout(tick, charMs);
       } else {
         setPrinted((prev) => [...prev, target]);

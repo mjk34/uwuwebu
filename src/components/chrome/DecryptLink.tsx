@@ -89,9 +89,7 @@ export default function DecryptLink({
     "aria-label": label,
     className,
     onMouseEnter: handleEnter,
-    onFocus: handleEnter,
     onMouseLeave: handleLeave,
-    onBlur: handleLeave,
     onClick: handleClick,
   } as const;
 

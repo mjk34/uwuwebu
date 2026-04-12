@@ -8,7 +8,6 @@ import { mockCurrentUser } from "@/lib/mock";
 import { useSubscribedValue } from "@/lib/client-values";
 
 export default function SignInPill() {
-  const [openCount, setOpenCount] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const active = useSubscribedValue(
     () => hasMockSession(),
@@ -18,7 +17,6 @@ export default function SignInPill() {
 
   const handleClick = () => {
     playSfx("click");
-    setOpenCount((c) => c + 1);
     setModalOpen(true);
   };
 
@@ -40,7 +38,7 @@ export default function SignInPill() {
         {label}
       </button>
       {modalOpen && (
-        <HackerModal key={openCount} onClose={() => setModalOpen(false)} />
+        <HackerModal onClose={() => setModalOpen(false)} />
       )}
     </>
   );

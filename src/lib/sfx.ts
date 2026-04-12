@@ -8,7 +8,8 @@ export type SfxName =
   | "tick"
   | "tick-metallic"
   | "tick-data"
-  | "tick-buzz";
+  | "tick-buzz"
+  | "cursor-blink";
 
 let ctx: AudioContext | null = null;
 
@@ -85,7 +86,8 @@ export function playSfx(name: SfxName): void {
       tone(440, 90, "square", 0.08);
       return;
     case "type":
-      noiseBurst(18, 0.04, 3200);
+      noiseBurst(6, 0.05, 6000);
+      tone(4000, 4, "sine", 0.02);
       return;
     case "tick":
       noiseBurst(22, 0.06, 2400);
@@ -122,6 +124,10 @@ export function playSfx(name: SfxName): void {
       noiseBurst(10, 0.08, 4000);
       tone(3200, 8, "square", 0.04);
       window.setTimeout(() => noiseBurst(6, 0.04, 5000), 15);
+      return;
+    case "cursor-blink":
+      // Soft sonar ping — gentle sine blip
+      tone(600, 80, "sine", 0.04);
       return;
   }
 }
