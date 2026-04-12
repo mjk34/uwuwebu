@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --bg-deep: #0a0a0c;
-  --bg-raised: #111115;
-  --bg-elevated: #17171d;
-  --fg: #ececf1;
-  --fg-muted: #9897a6;
-  --fg-dim: #55545e;
-  --accent: #c7b3ff;
-  --accent-dim: #7a6aa8;
-  --accent-deep: #2a2340;
-  --danger: #ff6b8e;
-  --ok: #a8f0d1;
+  --bg-deep: #0d0e14;
+  --bg-raised: #12141d;
+  --bg-elevated: #181a25;
+  --fg: #f0f1f5;
+  --fg-muted: #b2b7c7;
+  --fg-dim: #747d99;
+  --accent: #00f0ff;
+  --accent-dim: #0097a7;
+  --accent-deep: #005d6a;
+  --danger: #ff2a6d;
+  --ok: #05ffa1;
 }
 
 @theme inline {
@@ -40,6 +40,12 @@ body {
 *::selection {
   background: var(--accent);
   color: var(--bg-deep);
+}
+
+@media (pointer: fine) {
+  *, *::before, *::after {
+    cursor: none !important;
+  }
 }
 
 @keyframes cursor-blink {

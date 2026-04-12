@@ -51,35 +51,3 @@ export const mockCurrentUser: MockUser = mockUsers[0];
 export function getMockUser(discordId: string): MockUser | undefined {
   return mockUsers.find((u) => u.discordId === discordId);
 }
-
-export type MockGameDemo = {
-  id: string;
-  code: string;
-  title: string;
-  tagline: string;
-  heroSrc: string;
-};
-
-export const mockGameDemos: MockGameDemo[] = [
-  {
-    id: "cred-rush",
-    code: "DEMO.001",
-    title: "CRED RUSH",
-    tagline: "High-velocity market runner. Scalp the orderbook, cash out clean.",
-    heroSrc: "/demos/demo-1.svg",
-  },
-  {
-    id: "clip-oracle",
-    code: "DEMO.002",
-    title: "CLIP ORACLE",
-    tagline: "Rate the reels. Train the oracle. Rise through the ranks.",
-    heroSrc: "/demos/demo-2.svg",
-  },
-  {
-    id: "hysa-heist",
-    code: "DEMO.003",
-    title: "HYSA HEIST",
-    tagline: "Crack the vault, duck the audit, bank before the rate hike.",
-    heroSrc: "/demos/demo-3.svg",
-  },
-];

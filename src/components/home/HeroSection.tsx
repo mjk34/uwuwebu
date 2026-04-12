@@ -76,8 +76,9 @@ export default function HeroSection() {
       >
         {hovered ? (
           <>
-            <span className="text-fg">{display.slice(0, display.lastIndexOf(" "))}</span>{" "}
-            <span className="text-fg-dim">{display.slice(display.lastIndexOf(" ") + 1)}</span>
+            <span className="text-fg">{display.slice(0, 8)}</span>
+            <span className="text-accent">{display.slice(8, 15)}</span>
+            <span className="text-danger">{display.slice(15)}</span>
           </>
         ) : (
           <span className="text-fg">{display}</span>

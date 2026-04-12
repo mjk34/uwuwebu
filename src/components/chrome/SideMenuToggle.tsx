@@ -21,7 +21,7 @@ export default function SideMenuToggle() {
       aria-controls="uwuversity-side-menu"
       aria-label={open ? "Close menu" : "Open menu"}
       onClick={handleClick}
-      className="group fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-md border border-fg-dim/30 bg-bg-deep/70 backdrop-blur-sm transition-colors hover:border-accent/70 hover:bg-bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="group fixed left-5 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-md border border-fg-dim/30 bg-bg-deep/70 backdrop-blur-sm transition-all hover:border-accent/70 hover:bg-bg-raised hover:shadow-[0_0_12px_rgba(0,240,255,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       <span className="sr-only">{open ? "Close" : "Menu"}</span>
       <span className="relative block h-3.5 w-5">

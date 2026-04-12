@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { startDecryptSound, startGlitchSound } from "@/lib/sfx";
 
 type LiquefiedIntroProps = {
   onFinish: () => void;
@@ -22,9 +23,9 @@ function randomGlyph(): string {
   return GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
 }
 
-/** Random opacity with higher peaks for noisier look */
+const OPACITIES = [0.2, 0.5, 0.8] as const;
 function randomOpacity(): number {
-  return 0.08 + Math.random() * 0.52;
+  return OPACITIES[Math.floor(Math.random() * 3)];
 }
 
 function makeBlankChars(): string[] {
@@ -83,6 +84,8 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   const [glitch, setGlitch] = useState<GlitchFrame | null>(null);
   const [fadeOut, setFadeOut] = useState(false);
   const finished = useRef(false);
+  const decryptStopRef = useRef<(() => void) | null>(null);
+  const glitchStopRef = useRef<(() => void) | null>(null);
 
   // Scramble all rows during load — density ramps up over time
   useEffect(() => {
@@ -120,6 +123,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   useEffect(() => {
     if (phase !== "load") return;
     mountedRef.current = true;
+    decryptStopRef.current = startDecryptSound();
     const id = window.setTimeout(() => setPhase("reveal"), 700);
     return () => window.clearTimeout(id);
   }, [phase]);
@@ -220,9 +224,11 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
     };
   }, [phase, onFinish]);
 
-  // Hold briefly, then glitch
+  // Hold briefly, then glitch — stop decrypt sound
   useEffect(() => {
     if (phase !== "hold") return;
+    decryptStopRef.current?.();
+    decryptStopRef.current = null;
     const id = window.setTimeout(() => setPhase("glitch"), 0);
     return () => window.clearTimeout(id);
   }, [phase]);
@@ -230,6 +236,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   // Glitch phase — UWU jitters with RGB split, then fade
   useEffect(() => {
     if (phase !== "glitch") return;
+    glitchStopRef.current = startGlitchSound();
     const start = performance.now();
     const glitchDuration = 600;
 
@@ -252,6 +259,8 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   // Fade phase — smooth opacity transition out
   useEffect(() => {
     if (phase !== "fade") return;
+    glitchStopRef.current?.();
+    glitchStopRef.current = null;
     // Trigger CSS fade
     requestAnimationFrame(() => setFadeOut(true));
     const id = window.setTimeout(() => {
@@ -266,6 +275,8 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   const skip = () => {
     if (finished.current) return;
     finished.current = true;
+    decryptStopRef.current?.();
+    glitchStopRef.current?.();
     setPhase("done");
     onFinish();
   };
@@ -293,10 +304,10 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
       // Trail — UWU fading in (middle row only)
       if (dist < 0 && isUwu) {
         const o = Math.min(1, 0.3 + ((-dist / 8) * 0.7));
-        return <span key={i} style={{ color: `rgba(199,179,255,${o})` }}>{ch}</span>;
+        return <span key={i} style={{ color: `rgba(0,240,255,${o})` }}>{ch}</span>;
       }
       // Everything else — use pre-computed random opacity
-      return <span key={i} style={{ color: `rgba(199,179,255,${opacities[i]})` }}>{ch}</span>;
+      return <span key={i} style={{ color: `rgba(0,240,255,${opacities[i]})` }}>{ch}</span>;
     });
 
   const glitchStyle: React.CSSProperties = isGlitch && glitch
@@ -328,7 +339,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
                 opacity: 0.6,
               }}
             >
-              <pre className="select-none font-mono text-4xl font-black tracking-[0.2em] text-cyan-400 sm:text-5xl md:text-6xl lg:text-7xl">
+              <pre className="select-none font-mono text-4xl font-black tracking-[0.2em] text-accent sm:text-5xl md:text-6xl lg:text-7xl">
                 {"     U W U     "}
               </pre>
             </div>
@@ -340,7 +351,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
                 opacity: 0.6,
               }}
             >
-              <pre className="select-none font-mono text-4xl font-black tracking-[0.2em] text-red-500 sm:text-5xl md:text-6xl lg:text-7xl">
+              <pre className="select-none font-mono text-4xl font-black tracking-[0.2em] text-danger sm:text-5xl md:text-6xl lg:text-7xl">
                 {"     U W U     "}
               </pre>
             </div>

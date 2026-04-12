@@ -1,17 +1,23 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { isMuted, setMuted } from "@/lib/session";
-import { useSubscribedValue } from "@/lib/client-values";
+import { syncMuteState } from "@/lib/sfx";
 
 export default function MuteToggle() {
-  const muted = useSubscribedValue(
-    () => isMuted(),
-    ["uwuversity:mute-change"],
-    false,
-  );
+  const [muted, setLocal] = useState(false);
+
+  useEffect(() => {
+    const stored = isMuted();
+    setLocal(stored);
+    syncMuteState(stored);
+  }, []);
 
   const toggle = () => {
-    setMuted(!muted);
+    const next = !muted;
+    setLocal(next);
+    setMuted(next);
+    syncMuteState(next);
   };
 
   return (
@@ -20,7 +26,11 @@ export default function MuteToggle() {
       aria-pressed={!muted}
       aria-label={muted ? "Unmute sound effects" : "Mute sound effects"}
       onClick={toggle}
-      className="flex h-8 w-8 items-center justify-center rounded border border-fg-dim/30 bg-bg-deep/70 text-fg-muted transition-colors hover:border-accent/70 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className={`flex h-8 w-8 items-center justify-center rounded border bg-bg-deep/70 transition-all focus-visible:outline-none focus-visible:ring-2 ${
+        muted
+          ? "border-danger/50 text-danger hover:border-danger hover:shadow-[0_0_12px_rgba(255,42,109,0.35)]"
+          : "border-accent/40 text-accent hover:border-accent/70 hover:shadow-[0_0_12px_rgba(0,240,255,0.3)]"
+      } focus-visible:ring-accent`}
     >
       <svg
         viewBox="0 0 24 24"

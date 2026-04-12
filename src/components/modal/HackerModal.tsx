@@ -100,7 +100,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
     >
       <div
         ref={dialogRef}
-        className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(199,179,255,0.4)]"
+        className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(0,240,255,0.4)]"
       >
         <div className="flex items-center justify-between border-b border-fg-dim/30 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-fg-dim">
           <span>{"// tty/uwuversity/auth"}</span>
@@ -108,7 +108,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
             type="button"
             onClick={onClose}
             aria-label="Close terminal"
-            className="text-fg-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
+            className="text-fg-muted transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
           >
             [X]
           </button>
@@ -124,7 +124,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
               ref={ctaRef}
               type="button"
               onClick={handleConnect}
-              className="group mt-5 block w-full rounded-sm bg-accent/95 px-3 py-2 text-left font-mono text-base text-bg-deep transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="group mt-5 block w-full rounded-sm bg-accent/95 px-3 py-2 text-left font-mono text-base text-bg-deep transition-all hover:bg-accent hover:shadow-[0_0_16px_rgba(0,240,255,0.4)] focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <span>{CTA_TEXT}</span>
               <span

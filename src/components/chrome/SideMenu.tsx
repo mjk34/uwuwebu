@@ -92,7 +92,7 @@ export default function SideMenu() {
                 label={item.label}
                 as="button"
                 tickSfx={item.sfx}
-                className="inline-block text-left text-4xl font-black uppercase tracking-tight text-fg transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
+                className="inline-block text-left text-4xl font-black uppercase tracking-tight text-fg transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
               />
               <span className="pl-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-dim">
                 {item.desc}
@@ -110,7 +110,7 @@ export default function SideMenu() {
                 key={s.href}
                 label={s.label}
                 href={s.href}
-                className="inline-block text-left text-sm font-semibold uppercase tracking-widest text-fg-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
+                className="inline-block text-left text-sm font-semibold uppercase tracking-widest text-fg-muted transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
               />
             ))}
           </nav>
@@ -121,7 +121,7 @@ export default function SideMenu() {
             <button
               type="button"
               onClick={logout}
-              className="self-start font-mono text-xs uppercase tracking-widest text-danger transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
+              className="self-start font-mono text-xs uppercase tracking-widest text-danger transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
             >
               &gt; ./auth/discord --disconnect
             </button>

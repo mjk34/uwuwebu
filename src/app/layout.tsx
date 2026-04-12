@@ -5,6 +5,7 @@ import IntroGate from "@/components/intro/IntroGate";
 import TopStrip from "@/components/chrome/TopStrip";
 import SideMenuToggle from "@/components/chrome/SideMenuToggle";
 import SideMenu from "@/components/chrome/SideMenu";
+import CustomCursor from "@/components/chrome/CustomCursor";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="relative min-h-full bg-bg-deep text-fg">
+        <CustomCursor />
         <IntroGate />
         <SideMenuToggle />
         <SideMenu />

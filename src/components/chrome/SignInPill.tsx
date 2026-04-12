@@ -27,7 +27,7 @@ export default function SignInPill() {
       <button
         type="button"
         onClick={handleClick}
-        className="flex h-9 items-center gap-2 rounded-full border border-fg/80 bg-fg px-5 text-xs font-bold uppercase tracking-[0.2em] text-bg-deep transition-colors hover:border-accent hover:bg-accent hover:text-bg-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex h-9 items-center gap-2 rounded-full border border-fg/80 bg-fg px-5 text-xs font-bold uppercase tracking-[0.2em] text-bg-deep transition-colors hover:border-accent hover:bg-accent hover:text-bg-deep hover:shadow-[0_0_16px_rgba(0,240,255,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <span
           aria-hidden="true"
