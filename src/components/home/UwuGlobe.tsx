@@ -229,6 +229,15 @@ export default function UwuGlobe() {
       // --- Star field update & render ---
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      // Trigger new sparkles
+      const activeSparkles = stars.filter(s => s.sparkleTime >= 0).length;
+      if (activeSparkles < 2) {
+        const eligible = stars.filter(s => s.sparkleTime < 0 && s.cooldown <= 0);
+        if (eligible.length > 0 && Math.random() < 1 / (60 * (SPARKLE_INTERVAL_MIN + Math.random() * (SPARKLE_INTERVAL_MAX - SPARKLE_INTERVAL_MIN)))) {
+          const pick = eligible[(Math.random() * eligible.length) | 0];
+          pick.sparkleTime = 0;
+        }
+      }
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
 
@@ -249,6 +258,24 @@ export default function UwuGlobe() {
         if (dm > STAR_MAX_DISP) {
           s.dx *= STAR_MAX_DISP / dm;
           s.dy *= STAR_MAX_DISP / dm;
+        }
+
+        // Sparkle logic
+        if (s.sparkleTime >= 0) {
+          s.sparkleTime += 1 / 60;
+          if (s.sparkleTime >= SPARKLE_DURATION) {
+            s.sparkleTime = -1;
+            s.ch = s.baseCh;
+            s.alpha = s.baseAlpha;
+            s.cooldown = SPARKLE_COOLDOWN_MIN + Math.random() * (SPARKLE_COOLDOWN_MAX - SPARKLE_COOLDOWN_MIN);
+          } else {
+            const step = Math.min(SPARKLE_SEQ.length - 1, (s.sparkleTime / SPARKLE_STEP) | 0);
+            s.ch = SPARKLE_SEQ[step];
+            const progress = s.sparkleTime / SPARKLE_DURATION;
+            s.alpha = s.baseAlpha + (1.0 - s.baseAlpha) * Math.sin(progress * Math.PI);
+          }
+        } else {
+          s.cooldown -= 1 / 60;
         }
 
         // Drift
