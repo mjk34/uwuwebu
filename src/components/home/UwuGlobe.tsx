@@ -219,8 +219,8 @@ export default function UwuGlobe() {
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
     const orbiters = buildOrbiters();
     let dragDx = 0, dragDy = 0;
-    let mouseVxHist: number[] = [0, 0, 0];
-    let mouseVyHist: number[] = [0, 0, 0];
+    const mouseVxHist: number[] = [0, 0, 0];
+    const mouseVyHist: number[] = [0, 0, 0];
     let prevMouseX = -9000, prevMouseY = -9000;
 
     const resize = () => {
@@ -265,6 +265,7 @@ export default function UwuGlobe() {
     const frame = () => {
       const t = performance.now() / 1000;
       const elapsed = (performance.now() - startTime) / 1000;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       if (!dragging) {
         // Wait SPIN_DELAY seconds before starting auto-rotation
@@ -280,12 +281,14 @@ export default function UwuGlobe() {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       // Trigger new sparkles
-      const activeSparkles = stars.filter(s => s.sparkleTime >= 0).length;
-      if (activeSparkles < 2) {
-        const eligible = stars.filter(s => s.sparkleTime < 0 && s.cooldown <= 0);
-        if (eligible.length > 0 && Math.random() < 1 / (60 * (SPARKLE_INTERVAL_MIN + Math.random() * (SPARKLE_INTERVAL_MAX - SPARKLE_INTERVAL_MIN)))) {
-          const pick = eligible[(Math.random() * eligible.length) | 0];
-          pick.sparkleTime = 0;
+      if (!reduced) {
+        const activeSparkles = stars.filter(s => s.sparkleTime >= 0).length;
+        if (activeSparkles < 2) {
+          const eligible = stars.filter(s => s.sparkleTime < 0 && s.cooldown <= 0);
+          if (eligible.length > 0 && Math.random() < 1 / (60 * (SPARKLE_INTERVAL_MIN + Math.random() * (SPARKLE_INTERVAL_MAX - SPARKLE_INTERVAL_MIN)))) {
+            const pick = eligible[(Math.random() * eligible.length) | 0];
+            pick.sparkleTime = 0;
+          }
         }
       }
       for (let i = 0; i < stars.length; i++) {
@@ -311,7 +314,7 @@ export default function UwuGlobe() {
         }
 
         // Sparkle logic
-        if (s.sparkleTime >= 0) {
+        if (!reduced && s.sparkleTime >= 0) {
           s.sparkleTime += 1 / 60;
           if (s.sparkleTime >= SPARKLE_DURATION) {
             s.sparkleTime = -1;
@@ -329,8 +332,8 @@ export default function UwuGlobe() {
         }
 
         // Drift
-        const driftX = Math.sin(t * STAR_DRIFT_FREQ * Math.PI * 2 + s.phaseX) * STAR_DRIFT_AMP;
-        const driftY = Math.cos(t * STAR_DRIFT_FREQ * Math.PI * 2 + s.phaseY) * STAR_DRIFT_AMP;
+        const driftX = reduced ? 0 : Math.sin(t * STAR_DRIFT_FREQ * Math.PI * 2 + s.phaseX) * STAR_DRIFT_AMP;
+        const driftY = reduced ? 0 : Math.cos(t * STAR_DRIFT_FREQ * Math.PI * 2 + s.phaseY) * STAR_DRIFT_AMP;
 
         const fx = s.bx + s.dx + driftX;
         const fy = s.by + s.dy + driftY;
@@ -406,7 +409,7 @@ export default function UwuGlobe() {
 
         const ring = RING_CONFIGS[o.ringIndex];
 
-        if (o.state === "orbiting") {
+        if (o.state === "orbiting" && !reduced) {
           o.theta += ring.speed;
         }
 
@@ -446,60 +449,62 @@ export default function UwuGlobe() {
       }
 
       // --- Mouse capture & fling ---
-      const avgVx = mouseVxHist.reduce((a, b) => a + b, 0) / mouseVxHist.length;
-      const avgVy = mouseVyHist.reduce((a, b) => a + b, 0) / mouseVyHist.length;
-      const mouseSpeed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
+      if (!reduced) {
+        const avgVx = mouseVxHist.reduce((a, b) => a + b, 0) / mouseVxHist.length;
+        const avgVy = mouseVyHist.reduce((a, b) => a + b, 0) / mouseVyHist.length;
+        const mouseSpeed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
 
-      for (let i = 0; i < orbiters.length; i++) {
-        const o = orbiters[i];
+        for (let i = 0; i < orbiters.length; i++) {
+          const o = orbiters[i];
 
-        if (o.state === "flung") {
-          // Check if off-screen
-          if (o.screenX < -ORBIT_OFFSCREEN_MARGIN || o.screenX > W + ORBIT_OFFSCREEN_MARGIN ||
-              o.screenY < -ORBIT_OFFSCREEN_MARGIN || o.screenY > H + ORBIT_OFFSCREEN_MARGIN) {
-            respawnOrbiter(o, orbiters);
-          }
-          continue;
-        }
-
-        if (!mouseActive) {
-          if (o.state === "captured") o.state = "orbiting";
-          continue;
-        }
-
-        const distToMouse = Math.sqrt((o.screenX - mouseX) ** 2 + (o.screenY - mouseY) ** 2);
-
-        if (o.state === "orbiting") {
-          if (distToMouse < ORBIT_CAPTURE_DIST && mouseActive) {
-            o.state = "captured";
-            o.captureAngle = Math.atan2(o.screenY - mouseY, o.screenX - mouseX);
-            o.captureRadius = distToMouse;
-          }
-        } else if (o.state === "captured") {
-          if (mouseSpeed > ORBIT_FLING_THRESHOLD) {
-            o.state = "flung";
-            o.flungVx = avgVx;
-            o.flungVy = avgVy;
+          if (o.state === "flung") {
+            // Check if off-screen
+            if (o.screenX < -ORBIT_OFFSCREEN_MARGIN || o.screenX > W + ORBIT_OFFSCREEN_MARGIN ||
+                o.screenY < -ORBIT_OFFSCREEN_MARGIN || o.screenY > H + ORBIT_OFFSCREEN_MARGIN) {
+              respawnOrbiter(o, orbiters);
+            }
             continue;
           }
 
-          if (distToMouse > ORBIT_RELEASE_DIST) {
-            o.state = "orbiting";
+          if (!mouseActive) {
+            if (o.state === "captured") o.state = "orbiting";
             continue;
           }
 
-          // Orbit around mouse
-          o.captureAngle += ORBIT_MOUSE_SPEED / 60;
-          o.captureRadius += (ORBIT_CAPTURE_DECAY_TARGET - o.captureRadius) * 0.05;
-          o.screenX = mouseX + Math.cos(o.captureAngle) * o.captureRadius;
-          o.screenY = mouseY + Math.sin(o.captureAngle) * o.captureRadius;
+          const distToMouse = Math.sqrt((o.screenX - mouseX) ** 2 + (o.screenY - mouseY) ** 2);
 
-          // Update projected entry for this orbiter
-          const projIdx = projected.findIndex(p => p.i === -(i + 1));
-          if (projIdx >= 0) {
-            projected[projIdx].sx = o.screenX;
-            projected[projIdx].sy = o.screenY;
-            projected[projIdx].sz = -1; // force to front when captured
+          if (o.state === "orbiting") {
+            if (distToMouse < ORBIT_CAPTURE_DIST && mouseActive) {
+              o.state = "captured";
+              o.captureAngle = Math.atan2(o.screenY - mouseY, o.screenX - mouseX);
+              o.captureRadius = distToMouse;
+            }
+          } else if (o.state === "captured") {
+            if (mouseSpeed > ORBIT_FLING_THRESHOLD) {
+              o.state = "flung";
+              o.flungVx = avgVx;
+              o.flungVy = avgVy;
+              continue;
+            }
+
+            if (distToMouse > ORBIT_RELEASE_DIST) {
+              o.state = "orbiting";
+              continue;
+            }
+
+            // Orbit around mouse
+            o.captureAngle += ORBIT_MOUSE_SPEED / 60;
+            o.captureRadius += (ORBIT_CAPTURE_DECAY_TARGET - o.captureRadius) * 0.05;
+            o.screenX = mouseX + Math.cos(o.captureAngle) * o.captureRadius;
+            o.screenY = mouseY + Math.sin(o.captureAngle) * o.captureRadius;
+
+            // Update projected entry for this orbiter
+            const projIdx = projected.findIndex(p => p.i === -(i + 1));
+            if (projIdx >= 0) {
+              projected[projIdx].sx = o.screenX;
+              projected[projIdx].sy = o.screenY;
+              projected[projIdx].sz = -1; // force to front when captured
+            }
           }
         }
       }
