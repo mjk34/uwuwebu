@@ -179,6 +179,23 @@ function buildOrbiters(): Orbiter[] {
   return orbiters;
 }
 
+function respawnOrbiter(o: Orbiter, orbiters: Orbiter[]): void {
+  const ringmates = orbiters.filter(r => r.ringIndex === o.ringIndex && r !== o).map(r => r.char);
+  let ch: string;
+  do {
+    ch = ORBIT_CHARS[(Math.random() * ORBIT_CHARS.length) | 0];
+  } while (ringmates.includes(ch));
+
+  o.char = ch;
+  o.state = "orbiting";
+  o.theta = Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+  o.dx = 0; o.dy = 0;
+  o.vx = 0; o.vy = 0;
+  o.captureAngle = 0;
+  o.captureRadius = 0;
+  o.flungVx = 0; o.flungVy = 0;
+}
+
 export default function UwuGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -202,6 +219,9 @@ export default function UwuGlobe() {
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
     const orbiters = buildOrbiters();
     let dragDx = 0, dragDy = 0;
+    let mouseVxHist: number[] = [0, 0, 0];
+    let mouseVyHist: number[] = [0, 0, 0];
+    let prevMouseX = -9000, prevMouseY = -9000;
 
     const resize = () => {
       const r = container.getBoundingClientRect();
@@ -425,6 +445,65 @@ export default function UwuGlobe() {
         projected.push({ i: -(i + 1), sx, sy, sz: oz, sc: globeRadius * 0.04 });
       }
 
+      // --- Mouse capture & fling ---
+      const avgVx = mouseVxHist.reduce((a, b) => a + b, 0) / mouseVxHist.length;
+      const avgVy = mouseVyHist.reduce((a, b) => a + b, 0) / mouseVyHist.length;
+      const mouseSpeed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
+
+      for (let i = 0; i < orbiters.length; i++) {
+        const o = orbiters[i];
+
+        if (o.state === "flung") {
+          // Check if off-screen
+          if (o.screenX < -ORBIT_OFFSCREEN_MARGIN || o.screenX > W + ORBIT_OFFSCREEN_MARGIN ||
+              o.screenY < -ORBIT_OFFSCREEN_MARGIN || o.screenY > H + ORBIT_OFFSCREEN_MARGIN) {
+            respawnOrbiter(o, orbiters);
+          }
+          continue;
+        }
+
+        if (!mouseActive) {
+          if (o.state === "captured") o.state = "orbiting";
+          continue;
+        }
+
+        const distToMouse = Math.sqrt((o.screenX - mouseX) ** 2 + (o.screenY - mouseY) ** 2);
+
+        if (o.state === "orbiting") {
+          if (distToMouse < ORBIT_CAPTURE_DIST && mouseActive) {
+            o.state = "captured";
+            o.captureAngle = Math.atan2(o.screenY - mouseY, o.screenX - mouseX);
+            o.captureRadius = distToMouse;
+          }
+        } else if (o.state === "captured") {
+          if (mouseSpeed > ORBIT_FLING_THRESHOLD) {
+            o.state = "flung";
+            o.flungVx = avgVx;
+            o.flungVy = avgVy;
+            continue;
+          }
+
+          if (distToMouse > ORBIT_RELEASE_DIST) {
+            o.state = "orbiting";
+            continue;
+          }
+
+          // Orbit around mouse
+          o.captureAngle += ORBIT_MOUSE_SPEED / 60;
+          o.captureRadius += (ORBIT_CAPTURE_DECAY_TARGET - o.captureRadius) * 0.05;
+          o.screenX = mouseX + Math.cos(o.captureAngle) * o.captureRadius;
+          o.screenY = mouseY + Math.sin(o.captureAngle) * o.captureRadius;
+
+          // Update projected entry for this orbiter
+          const projIdx = projected.findIndex(p => p.i === -(i + 1));
+          if (projIdx >= 0) {
+            projected[projIdx].sx = o.screenX;
+            projected[projIdx].sy = o.screenY;
+            projected[projIdx].sz = -1; // force to front when captured
+          }
+        }
+      }
+
       // Reset drag delta each frame (consumed by stars and orbiters)
       dragDx = 0;
       dragDy = 0;
@@ -511,6 +590,15 @@ export default function UwuGlobe() {
       mouseX = e.clientX - r.left;
       mouseY = e.clientY - r.top;
       mouseActive = mouseX >= 0 && mouseX <= r.width && mouseY >= 0 && mouseY <= r.height;
+
+      if (prevMouseX > -1000) {
+        mouseVxHist.push(e.clientX - prevMouseX);
+        mouseVyHist.push(e.clientY - prevMouseY);
+        if (mouseVxHist.length > 3) mouseVxHist.shift();
+        if (mouseVyHist.length > 3) mouseVyHist.shift();
+      }
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
 
       if (!dragging) return;
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
