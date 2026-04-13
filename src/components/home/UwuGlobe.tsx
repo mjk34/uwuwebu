@@ -115,6 +115,41 @@ function buildParticles(): Particle[] {
   });
 }
 
+function buildStars(W: number, H: number, globeRadius: number): Star[] {
+  const stars: Star[] = [];
+  const cx = W / 2;
+  const cy = H / 2;
+  const exclusion = globeRadius * STAR_EXCLUSION;
+
+  for (let i = 0; i < STAR_COUNT; i++) {
+    let x: number, y: number;
+    do {
+      x = Math.random() * W;
+      y = Math.random() * H;
+    } while (Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) < exclusion);
+
+    const color = STAR_COLORS[Math.random() < 0.5 ? 0 : 1];
+    const baseCh = STAR_CHARS[(Math.random() * STAR_CHARS.length) | 0];
+
+    stars.push({
+      bx: x, by: y,
+      dx: 0, dy: 0,
+      vx: 0, vy: 0,
+      phaseX: Math.random() * Math.PI * 2,
+      phaseY: Math.random() * Math.PI * 2,
+      ch: baseCh,
+      baseCh,
+      fontSize: 8 + Math.random() * 4,
+      color,
+      baseAlpha: 0.2 + Math.random() * 0.3,
+      alpha: 0.2 + Math.random() * 0.3,
+      sparkleTime: -1,
+      cooldown: Math.random() * 3,
+    });
+  }
+  return stars;
+}
+
 export default function UwuGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,6 +170,8 @@ export default function UwuGlobe() {
     let dragging = false, lastX = 0, lastY = 0;
     let spinVelocity = DEF_VY;
     let mouseX = -9000, mouseY = -9000, mouseActive = false;
+    let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
+    let dragDx = 0, dragDy = 0;
 
     const resize = () => {
       const r = container.getBoundingClientRect();
@@ -146,6 +183,7 @@ export default function UwuGlobe() {
       cv.style.width = `${W}px`;
       cv.style.height = `${H}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      stars = buildStars(W, H, Math.min(W, H, 700) * 0.38);
     };
 
     const rotate3D = (x: number, y: number, z: number): [number, number, number] => {
@@ -187,6 +225,47 @@ export default function UwuGlobe() {
       }
 
       ctx.clearRect(0, 0, W, H);
+
+      // --- Star field update & render ---
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i < stars.length; i++) {
+        const s = stars[i];
+
+        // Drag parallax response
+        s.vx += dragDx * STAR_PARALLAX;
+        s.vy += dragDy * STAR_PARALLAX;
+
+        // Spring-back
+        s.vx -= s.dx * STAR_SPRING;
+        s.vy -= s.dy * STAR_SPRING;
+        s.vx *= STAR_DAMPING;
+        s.vy *= STAR_DAMPING;
+        s.dx += s.vx;
+        s.dy += s.vy;
+
+        // Clamp displacement
+        const dm = Math.sqrt(s.dx * s.dx + s.dy * s.dy);
+        if (dm > STAR_MAX_DISP) {
+          s.dx *= STAR_MAX_DISP / dm;
+          s.dy *= STAR_MAX_DISP / dm;
+        }
+
+        // Drift
+        const driftX = Math.sin(t * STAR_DRIFT_FREQ * Math.PI * 2 + s.phaseX) * STAR_DRIFT_AMP;
+        const driftY = Math.cos(t * STAR_DRIFT_FREQ * Math.PI * 2 + s.phaseY) * STAR_DRIFT_AMP;
+
+        const fx = s.bx + s.dx + driftX;
+        const fy = s.by + s.dy + driftY;
+
+        ctx.font = `${s.fontSize.toFixed(1)}px ${FONT}`;
+        ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${s.alpha.toFixed(2)})`;
+        ctx.fillText(s.ch, fx, fy);
+      }
+      // Reset drag delta each frame (consumed)
+      dragDx = 0;
+      dragDy = 0;
+
       const projected: { i: number; sx: number; sy: number; sz: number; sc: number }[] = [];
 
       // Unproject mouse onto sphere surface, then to world space
@@ -303,6 +382,8 @@ export default function UwuGlobe() {
       lastX = e.clientX;
       lastY = e.clientY;
       spinVelocity = dx * 0.0004;
+      dragDx = dx;
+      dragDy = dy;
     };
 
     const onMouseUp = () => { dragging = false; };
@@ -336,6 +417,8 @@ export default function UwuGlobe() {
         lastX = e.touches[0].clientX;
         lastY = e.touches[0].clientY;
         spinVelocity = dx * 0.0004;
+        dragDx = dx;
+        dragDy = dy;
       }
       e.preventDefault();
     };
