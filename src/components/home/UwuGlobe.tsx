@@ -10,7 +10,7 @@ const CHEEK_COLOR: [number, number, number] = [255, 120, 180];
 const FONT = "var(--font-geist-mono), 'SF Mono', 'Fira Code', 'Courier New', monospace";
 
 const DEF_RX = -0.1;
-const DEF_VY = 0.0012;
+const DEF_VY = 0.00096;
 const REPULSE_ANGLE = 0.25;   // radians — outer reach of influence
 const REPULSE_FORCE = 2.5;
 const RING_CENTER = 0.1;      // radians — where the ring peaks

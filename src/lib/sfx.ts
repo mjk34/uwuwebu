@@ -299,7 +299,162 @@ export function startGlitchSound(): (() => void) | null {
 export function syncMuteState(isMuted: boolean): void {
   muted = isMuted;
   if (masterGain) masterGain.gain.value = muted ? 0 : 1;
-  if (ctx && muted) void ctx.suspend();
+  if (ctx) {
+    if (muted) void ctx.suspend();
+    else void ctx.resume();
+  }
+}
+
+/** Dark ambient background — NieR-inspired: deep drones, dissonance, metallic resonance. Returns stop fn. */
+export function startBgMusic(): (() => void) | null {
+  if (muted) return null;
+  const ac = getCtx();
+  if (!ac) return null;
+  if (ac.state === "suspended") void ac.resume().catch(() => {});
+
+  const now = ac.currentTime;
+  const out = masterOut();
+
+  // ── Layer 1: Deep sub drone — slow sine with subtle pitch drift ──
+  const drone = ac.createOscillator();
+  drone.type = "sine";
+  drone.frequency.setValueAtTime(55, now); // A1
+  // Very slow pitch wander: 55 → 52 → 55 over ~30s
+  const droneLfo = ac.createOscillator();
+  droneLfo.type = "sine";
+  droneLfo.frequency.setValueAtTime(0.033, now);
+  const droneLfoGain = ac.createGain();
+  droneLfoGain.gain.setValueAtTime(3, now); // ±3Hz drift
+  droneLfo.connect(droneLfoGain);
+  droneLfoGain.connect(drone.frequency);
+  const droneLp = ac.createBiquadFilter();
+  droneLp.type = "lowpass";
+  droneLp.frequency.setValueAtTime(90, now);
+  const droneGain = ac.createGain();
+  droneGain.gain.setValueAtTime(0, now);
+  droneGain.gain.linearRampToValueAtTime(0.035, now + 6);
+  drone.connect(droneLp).connect(droneGain).connect(out);
+  droneLfo.start(now);
+  drone.start(now);
+
+  // ── Layer 2: Dissonant pad — minor 2nd + tritone, filtered ──
+  const pad1 = ac.createOscillator();
+  const pad2 = ac.createOscillator();
+  const pad3 = ac.createOscillator();
+  pad1.type = "triangle";
+  pad2.type = "triangle";
+  pad3.type = "sine";
+  pad1.frequency.setValueAtTime(82.41, now);  // E2
+  pad2.frequency.setValueAtTime(87.31, now);  // F2 — minor 2nd against E
+  pad3.frequency.setValueAtTime(116.54, now); // Bb2 — tritone against E
+  const padLp = ac.createBiquadFilter();
+  padLp.type = "lowpass";
+  padLp.frequency.setValueAtTime(200, now);
+  padLp.Q.setValueAtTime(1, now);
+  // Ultra-slow filter sweep: 200 → 400 → 200 over ~45s
+  const padLfo = ac.createOscillator();
+  padLfo.type = "sine";
+  padLfo.frequency.setValueAtTime(0.022, now);
+  const padLfoGain = ac.createGain();
+  padLfoGain.gain.setValueAtTime(100, now);
+  padLfo.connect(padLfoGain);
+  padLfoGain.connect(padLp.frequency);
+  const padGain = ac.createGain();
+  padGain.gain.setValueAtTime(0, now);
+  padGain.gain.linearRampToValueAtTime(0.012, now + 8);
+  pad1.connect(padLp);
+  pad2.connect(padLp);
+  pad3.connect(padLp);
+  padLp.connect(padGain).connect(out);
+  padLfo.start(now);
+  pad1.start(now);
+  pad2.start(now);
+  pad3.start(now);
+
+  // ── Layer 3: Eerie high tone — very quiet, slow tremolo ──
+  const eerie = ac.createOscillator();
+  eerie.type = "sine";
+  eerie.frequency.setValueAtTime(880, now); // A5
+  // Slow pitch wobble for unease
+  const eerieLfo = ac.createOscillator();
+  eerieLfo.type = "sine";
+  eerieLfo.frequency.setValueAtTime(0.07, now);
+  const eerieLfoGain = ac.createGain();
+  eerieLfoGain.gain.setValueAtTime(8, now); // ±8Hz wobble
+  eerieLfo.connect(eerieLfoGain);
+  eerieLfoGain.connect(eerie.frequency);
+  // Tremolo
+  const tremLfo = ac.createOscillator();
+  tremLfo.type = "sine";
+  tremLfo.frequency.setValueAtTime(0.08, now);
+  const eerieGain = ac.createGain();
+  eerieGain.gain.setValueAtTime(0, now);
+  eerieGain.gain.linearRampToValueAtTime(0.004, now + 10);
+  const tremDepth = ac.createGain();
+  tremDepth.gain.setValueAtTime(0.003, now);
+  tremLfo.connect(tremDepth);
+  tremDepth.connect(eerieGain.gain);
+  eerie.connect(eerieGain).connect(out);
+  eerieLfo.start(now);
+  tremLfo.start(now);
+  eerie.start(now);
+
+  // ── Layer 4: Metallic resonance hits — sparse, dissonant ──
+  const hitFreqs = [130.81, 138.59, 185.0, 246.94, 369.99, 493.88];
+  // C3, C#3, F#3, B3, F#4, B4 — all tritone/minor2nd relations
+  let hitTimer: number | null = null;
+
+  const scheduleHit = () => {
+    const delay = 6000 + Math.random() * 12000; // 6–18s
+    hitTimer = window.setTimeout(() => {
+      if (muted || !ac) return;
+      const t = ac.currentTime;
+      const freq = hitFreqs[(Math.random() * hitFreqs.length) | 0];
+
+      // Resonant sine with sharp attack, long decay
+      const osc = ac.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      // Slight pitch drop for metallic feel
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.97, t + 4);
+
+      // High-Q bandpass for metallic resonance
+      const bp = ac.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(freq, t);
+      bp.Q.setValueAtTime(12, t);
+
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.015, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
+      osc.connect(bp).connect(g).connect(out);
+      osc.start(t);
+      osc.stop(t + 5.5);
+      scheduleHit();
+    }, delay);
+  };
+  scheduleHit();
+
+  // ── Cleanup ──
+  const allOscs = [drone, droneLfo, pad1, pad2, pad3, padLfo, eerie, eerieLfo, tremLfo];
+
+  return () => {
+    if (hitTimer !== null) window.clearTimeout(hitTimer);
+    const t = ac.currentTime;
+    droneGain.gain.cancelScheduledValues(t);
+    padGain.gain.cancelScheduledValues(t);
+    eerieGain.gain.cancelScheduledValues(t);
+    droneGain.gain.setValueAtTime(droneGain.gain.value, t);
+    padGain.gain.setValueAtTime(padGain.gain.value, t);
+    eerieGain.gain.setValueAtTime(eerieGain.gain.value, t);
+    droneGain.gain.linearRampToValueAtTime(0, t + 2);
+    padGain.gain.linearRampToValueAtTime(0, t + 2);
+    eerieGain.gain.linearRampToValueAtTime(0, t + 2);
+    for (const o of allOscs) {
+      try { o.stop(t + 2.5); } catch { /* already stopped */ }
+    }
+  };
 }
 
 export function preloadSfx(): void {

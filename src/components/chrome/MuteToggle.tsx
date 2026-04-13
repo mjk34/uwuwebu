@@ -45,8 +45,8 @@ export default function MuteToggle() {
         <path d="M11 5 L6 9 H2 V15 H6 L11 19 Z" fill="currentColor" stroke="none" />
         {muted ? (
           <>
-            <line x1="17" y1="9" x2="22" y2="14" />
-            <line x1="22" y1="9" x2="17" y2="14" />
+            <line x1="17" y1="9" x2="22" y2="15" />
+            <line x1="22" y1="9" x2="17" y2="15" />
           </>
         ) : (
           <>
