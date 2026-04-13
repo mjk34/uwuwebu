@@ -1,5 +1,6 @@
 import HeroSection from "@/components/home/HeroSection";
 import ParallaxDots from "@/components/home/ParallaxDots";
+import UwuGlobe from "@/components/home/UwuGlobe";
 
 export default function HomePage() {
   return (
@@ -14,12 +15,13 @@ export default function HomePage() {
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-[1]"
+        className="pointer-events-none absolute inset-0 z-0"
         style={{
           background: "radial-gradient(ellipse 70% 65% at 50% 50%, transparent 60%, rgba(13,14,20,0.45) 100%)",
         }}
       />
       <HeroSection />
+      <UwuGlobe />
       <footer className="relative z-[2] mt-auto border-t border-fg-dim/20 px-8 py-3 font-mono text-[10px] uppercase tracking-[0.3em] text-fg-dim sm:px-14 lg:px-20">
         {"// UWUVERSITY / NON-ACCREDITED / 2026"}
       </footer>

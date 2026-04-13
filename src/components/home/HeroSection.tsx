@@ -67,7 +67,7 @@ export default function HeroSection() {
   return (
     <section
       aria-label="UwUversity intro"
-      className="relative z-[2] flex w-full flex-1 flex-col justify-center overflow-hidden px-8 pt-20 sm:px-14 lg:px-20"
+      className="relative z-[2] flex w-full flex-col justify-end overflow-hidden px-8 pb-4 pt-20 sm:px-14 lg:px-20"
     >
       <h1
         onMouseEnter={handleEnter}
