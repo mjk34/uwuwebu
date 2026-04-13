@@ -25,6 +25,70 @@ const BODY_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789@#%&*+-~";
 const FACE_CHARS = ["U", "W", "#", "@", "%"];
 const CHEEK_CHARS = ["o", "O", "*", "@"];
 
+// --- Star field ---
+const STAR_COUNT = 50;
+const STAR_CHARS = [".", "·", "*", "✦"];
+const SPARKLE_SEQ = [".", "·", "*", "✦", "*", "·", "."];
+const SPARKLE_DURATION = 1.2; // seconds
+const SPARKLE_STEP = SPARKLE_DURATION / SPARKLE_SEQ.length;
+const SPARKLE_COOLDOWN_MIN = 1.0;
+const SPARKLE_COOLDOWN_MAX = 3.0;
+const SPARKLE_INTERVAL_MIN = 0.8;
+const SPARKLE_INTERVAL_MAX = 1.5;
+const STAR_DRIFT_AMP = 4;   // px
+const STAR_DRIFT_FREQ = 0.4; // Hz
+const STAR_PARALLAX = 0.2;
+const STAR_SPRING = 0.015;
+const STAR_DAMPING = 0.94;
+const STAR_MAX_DISP = 20;
+const STAR_EXCLUSION = 1.3;  // × globe radius
+const STAR_COLORS: [number, number, number][] = [
+  [255, 255, 255],
+  [199, 179, 255],
+];
+
+// --- Orbital rings ---
+const ORBIT_CHARS = ["UwU", "OwO", ">w<", "^w^", ":3", "@", "#", "$"];
+const RING_CONFIGS = [
+  { rx: 1.15, ry: 0.28, tilt: -15 * Math.PI / 180, speed: 0.00096 * 1.8, count: 3, color: [20, 255, 200] as [number, number, number] },
+  { rx: 1.45, ry: 0.32, tilt: -30 * Math.PI / 180, speed: 0.00096 * 1.3, count: 2, color: [255, 120, 180] as [number, number, number] },
+];
+const ORBIT_CAPTURE_DIST = 80;
+const ORBIT_RELEASE_DIST = 120;
+const ORBIT_MOUSE_SPEED = 4; // rad/s
+const ORBIT_CAPTURE_DECAY_TARGET = 30;
+const ORBIT_FLING_THRESHOLD = 8; // px/frame
+const ORBIT_FLING_DRAG = 0.98;
+const ORBIT_OFFSCREEN_MARGIN = 50;
+
+type Star = {
+  bx: number; by: number;
+  dx: number; dy: number;
+  vx: number; vy: number;
+  phaseX: number; phaseY: number;
+  ch: string;
+  baseCh: string;
+  fontSize: number;
+  color: [number, number, number];
+  baseAlpha: number;
+  alpha: number;
+  sparkleTime: number;
+  cooldown: number;
+};
+
+type Orbiter = {
+  ringIndex: number;
+  theta: number;
+  char: string;
+  state: "orbiting" | "captured" | "flung";
+  dx: number; dy: number;
+  vx: number; vy: number;
+  captureAngle: number;
+  captureRadius: number;
+  flungVx: number; flungVy: number;
+  screenX: number; screenY: number;
+};
+
 type Particle = {
   bx: number; by: number; bz: number;
   dx: number; dy: number; dz: number;
@@ -104,7 +168,7 @@ export default function UwuGlobe() {
     };
 
     const project = (x: number, y: number, z: number): [number, number, number, number] => {
-      const base = Math.min(W, H, 800);
+      const base = Math.min(W, H, 700);
       const fov = 2.4;
       const scale = base * 0.38 * fov / (fov + z);
       return [W / 2 + x * scale, H / 2 + y * scale, z, scale];
@@ -126,7 +190,7 @@ export default function UwuGlobe() {
       const projected: { i: number; sx: number; sy: number; sz: number; sc: number }[] = [];
 
       // Unproject mouse onto sphere surface, then to world space
-      const base = Math.min(W, H, 800);
+      const base = Math.min(W, H, 700);
       const approxScale = base * 0.38;
       const mx3d = (mouseX - W / 2) / approxScale;
       const my3d = (mouseY - H / 2) / approxScale;
