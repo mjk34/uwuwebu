@@ -189,7 +189,7 @@ export default function UwuGlobe() {
 
       for (const pr of projected) {
         const p = particles[pr.i];
-        const facing = Math.max(0, (-pr.sz + 0.8) * 1.8);
+        const facing = Math.max(0, (-pr.sz + 0.4) * 2.5);
         if (facing < 0.02) continue;
 
         const glow = 0.3 + Math.sin(p.pulse) * 0.1;

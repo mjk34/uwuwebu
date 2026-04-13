@@ -361,7 +361,7 @@ export function startBgMusic(): (() => void) | null {
   padLfoGain.connect(padLp.frequency);
   const padGain = ac.createGain();
   padGain.gain.setValueAtTime(0, now);
-  padGain.gain.linearRampToValueAtTime(0.012, now + 8);
+  padGain.gain.linearRampToValueAtTime(0.007, now + 8);
   pad1.connect(padLp);
   pad2.connect(padLp);
   pad3.connect(padLp);
@@ -371,54 +371,69 @@ export function startBgMusic(): (() => void) | null {
   pad2.start(now);
   pad3.start(now);
 
-  // ── Layer 3: Eerie high tone — very quiet, slow tremolo ──
-  const eerie = ac.createOscillator();
-  eerie.type = "sine";
-  eerie.frequency.setValueAtTime(880, now); // A5
-  // Slow pitch wobble for unease
-  const eerieLfo = ac.createOscillator();
-  eerieLfo.type = "sine";
-  eerieLfo.frequency.setValueAtTime(0.07, now);
-  const eerieLfoGain = ac.createGain();
-  eerieLfoGain.gain.setValueAtTime(8, now); // ±8Hz wobble
-  eerieLfo.connect(eerieLfoGain);
-  eerieLfoGain.connect(eerie.frequency);
-  // Tremolo
-  const tremLfo = ac.createOscillator();
-  tremLfo.type = "sine";
-  tremLfo.frequency.setValueAtTime(0.08, now);
-  const eerieGain = ac.createGain();
-  eerieGain.gain.setValueAtTime(0, now);
-  eerieGain.gain.linearRampToValueAtTime(0.004, now + 10);
-  const tremDepth = ac.createGain();
-  tremDepth.gain.setValueAtTime(0.003, now);
-  tremLfo.connect(tremDepth);
-  tremDepth.connect(eerieGain.gain);
-  eerie.connect(eerieGain).connect(out);
-  eerieLfo.start(now);
-  tremLfo.start(now);
-  eerie.start(now);
+  // ── Layer 3: Slow rhythmic pulse — sub kick pattern ──
+  const bpm = 70;
+  const beatSec = 60 / bpm;
+  let pulseTimer: number | null = null;
+  let beat = 0;
+
+  const schedulePulse = () => {
+    pulseTimer = window.setTimeout(() => {
+      if (muted || !ac) return;
+      const t = ac.currentTime;
+      beat++;
+
+      // Sub kick — sine that drops from 80Hz to 30Hz
+      const kick = ac.createOscillator();
+      kick.type = "sine";
+      kick.frequency.setValueAtTime(80, t);
+      kick.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+      const kickG = ac.createGain();
+      kickG.gain.setValueAtTime(0.02, t);
+      kickG.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      kick.connect(kickG).connect(out);
+      kick.start(t);
+      kick.stop(t + 0.5);
+
+      // Every 4th beat — add a quiet metallic tick
+      if (beat % 4 === 0) {
+        const tick = ac.createOscillator();
+        tick.type = "square";
+        tick.frequency.setValueAtTime(1200, t);
+        tick.frequency.exponentialRampToValueAtTime(800, t + 0.05);
+        const tickG = ac.createGain();
+        tickG.gain.setValueAtTime(0.006, t);
+        tickG.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+        const tickHp = ac.createBiquadFilter();
+        tickHp.type = "highpass";
+        tickHp.frequency.setValueAtTime(600, t);
+        tick.connect(tickHp).connect(tickG).connect(out);
+        tick.start(t);
+        tick.stop(t + 0.2);
+      }
+
+      schedulePulse();
+    }, beatSec * 1000);
+  };
+  // Start pulse after fade-in
+  const pulseDelay = window.setTimeout(() => schedulePulse(), 6000);
 
   // ── Layer 4: Metallic resonance hits — sparse, dissonant ──
   const hitFreqs = [130.81, 138.59, 185.0, 246.94, 369.99, 493.88];
-  // C3, C#3, F#3, B3, F#4, B4 — all tritone/minor2nd relations
   let hitTimer: number | null = null;
 
   const scheduleHit = () => {
-    const delay = 6000 + Math.random() * 12000; // 6–18s
+    const delay = 4000 + Math.random() * 8000; // 4–12s (more frequent)
     hitTimer = window.setTimeout(() => {
       if (muted || !ac) return;
       const t = ac.currentTime;
       const freq = hitFreqs[(Math.random() * hitFreqs.length) | 0];
 
-      // Resonant sine with sharp attack, long decay
       const osc = ac.createOscillator();
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, t);
-      // Slight pitch drop for metallic feel
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.97, t + 4);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.97, t + 3);
 
-      // High-Q bandpass for metallic resonance
       const bp = ac.createBiquadFilter();
       bp.type = "bandpass";
       bp.frequency.setValueAtTime(freq, t);
@@ -426,31 +441,30 @@ export function startBgMusic(): (() => void) | null {
 
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.015, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
+      g.gain.linearRampToValueAtTime(0.009, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3.5);
       osc.connect(bp).connect(g).connect(out);
       osc.start(t);
-      osc.stop(t + 5.5);
+      osc.stop(t + 4);
       scheduleHit();
     }, delay);
   };
   scheduleHit();
 
   // ── Cleanup ──
-  const allOscs = [drone, droneLfo, pad1, pad2, pad3, padLfo, eerie, eerieLfo, tremLfo];
+  const allOscs = [drone, droneLfo, pad1, pad2, pad3, padLfo];
 
   return () => {
     if (hitTimer !== null) window.clearTimeout(hitTimer);
+    if (pulseTimer !== null) window.clearTimeout(pulseTimer);
+    window.clearTimeout(pulseDelay);
     const t = ac.currentTime;
     droneGain.gain.cancelScheduledValues(t);
     padGain.gain.cancelScheduledValues(t);
-    eerieGain.gain.cancelScheduledValues(t);
     droneGain.gain.setValueAtTime(droneGain.gain.value, t);
     padGain.gain.setValueAtTime(padGain.gain.value, t);
-    eerieGain.gain.setValueAtTime(eerieGain.gain.value, t);
     droneGain.gain.linearRampToValueAtTime(0, t + 2);
     padGain.gain.linearRampToValueAtTime(0, t + 2);
-    eerieGain.gain.linearRampToValueAtTime(0, t + 2);
     for (const o of allOscs) {
       try { o.stop(t + 2.5); } catch { /* already stopped */ }
     }
