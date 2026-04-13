@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { isMuted, setMuted } from "@/lib/session";
 import { syncMuteState } from "@/lib/sfx";
+import { syncBgMusicMute } from "@/components/home/BgMusic";
 
 export default function MuteToggle() {
   const [muted, setLocal] = useState(false);
@@ -18,6 +19,7 @@ export default function MuteToggle() {
     setLocal(next);
     setMuted(next);
     syncMuteState(next);
+    syncBgMusicMute(next);
   };
 
   return (
