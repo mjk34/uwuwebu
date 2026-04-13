@@ -150,6 +150,35 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
   return stars;
 }
 
+function buildOrbiters(): Orbiter[] {
+  const orbiters: Orbiter[] = [];
+  for (let r = 0; r < RING_CONFIGS.length; r++) {
+    const ring = RING_CONFIGS[r];
+    const usedChars: string[] = [];
+    for (let i = 0; i < ring.count; i++) {
+      let ch: string;
+      do {
+        ch = ORBIT_CHARS[(Math.random() * ORBIT_CHARS.length) | 0];
+      } while (usedChars.includes(ch));
+      usedChars.push(ch);
+
+      orbiters.push({
+        ringIndex: r,
+        theta: (i / ring.count) * Math.PI * 2,
+        char: ch,
+        state: "orbiting",
+        dx: 0, dy: 0,
+        vx: 0, vy: 0,
+        captureAngle: 0,
+        captureRadius: 0,
+        flungVx: 0, flungVy: 0,
+        screenX: 0, screenY: 0,
+      });
+    }
+  }
+  return orbiters;
+}
+
 export default function UwuGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -171,6 +200,7 @@ export default function UwuGlobe() {
     let spinVelocity = DEF_VY;
     let mouseX = -9000, mouseY = -9000, mouseActive = false;
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
+    const orbiters = buildOrbiters();
     let dragDx = 0, dragDy = 0;
 
     const resize = () => {
@@ -289,11 +319,8 @@ export default function UwuGlobe() {
         ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${s.alpha.toFixed(2)})`;
         ctx.fillText(s.ch, fx, fy);
       }
-      // Reset drag delta each frame (consumed)
-      dragDx = 0;
-      dragDy = 0;
-
       const projected: { i: number; sx: number; sy: number; sz: number; sc: number }[] = [];
+      const globeRadius = Math.min(W, H, 700) * 0.38;
 
       // Unproject mouse onto sphere surface, then to world space
       const base = Math.min(W, H, 700);
@@ -352,12 +379,83 @@ export default function UwuGlobe() {
         projected.push({ i, sx, sy, sz, sc });
       }
 
+      // --- Orbiter position computation ---
+      for (let i = 0; i < orbiters.length; i++) {
+        const o = orbiters[i];
+        if (o.state === "flung") continue; // handled separately
+
+        const ring = RING_CONFIGS[o.ringIndex];
+
+        if (o.state === "orbiting") {
+          o.theta += ring.speed;
+        }
+
+        // Ellipse position in ring-local coords
+        const ex = Math.cos(o.theta) * ring.rx * globeRadius;
+        const ey = Math.sin(o.theta) * ring.ry * globeRadius;
+
+        // Apply ring tilt (rotation around X axis in 2D → gives y,z from ey)
+        const cosT = Math.cos(ring.tilt);
+        const sinT = Math.sin(ring.tilt);
+        const oy = ey * cosT;
+        const oz = ey * sinT;
+
+        // Drag spring-back (same physics as stars)
+        o.vx += dragDx * STAR_PARALLAX;
+        o.vy += dragDy * STAR_PARALLAX;
+        o.vx -= o.dx * STAR_SPRING;
+        o.vy -= o.dy * STAR_SPRING;
+        o.vx *= STAR_DAMPING;
+        o.vy *= STAR_DAMPING;
+        o.dx += o.vx;
+        o.dy += o.vy;
+        const odm = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
+        if (odm > STAR_MAX_DISP) {
+          o.dx *= STAR_MAX_DISP / odm;
+          o.dy *= STAR_MAX_DISP / odm;
+        }
+
+        const sx = W / 2 + ex + o.dx;
+        const sy = H / 2 + oy + o.dy;
+
+        o.screenX = sx;
+        o.screenY = sy;
+
+        // Push into projected array for depth sorting with globe particles
+        projected.push({ i: -(i + 1), sx, sy, sz: oz, sc: globeRadius * 0.04 });
+      }
+
+      // Reset drag delta each frame (consumed by stars and orbiters)
+      dragDx = 0;
+      dragDy = 0;
+
       projected.sort((a, b) => a.sz - b.sz);
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
       for (const pr of projected) {
+        // Orbiter rendering
+        if (pr.i < 0) {
+          const oi = -(pr.i + 1);
+          const o = orbiters[oi];
+          if (o.state !== "orbiting" && o.state !== "captured") continue;
+          const ring = RING_CONFIGS[o.ringIndex];
+          const facing = Math.max(0, (-pr.sz + 0.3 * globeRadius) / (0.6 * globeRadius));
+          if (facing < 0.05) continue;
+          const al = Math.min(1, facing);
+          const fs = 14 + (pr.sz < 0 ? 2 : 0);
+          // Glow layer
+          ctx.font = `bold ${(fs + 2).toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${ring.color[0]},${ring.color[1]},${ring.color[2]},${(al * 0.2).toFixed(2)})`;
+          ctx.fillText(o.char, pr.sx, pr.sy);
+          // Main layer
+          ctx.font = `bold ${fs.toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${ring.color[0]},${ring.color[1]},${ring.color[2]},${al.toFixed(2)})`;
+          ctx.fillText(o.char, pr.sx, pr.sy);
+          continue;
+        }
+
         const p = particles[pr.i];
         const facing = Math.max(0, (-pr.sz + 0.4) * 2.5);
         if (facing < 0.02) continue;
@@ -383,6 +481,19 @@ export default function UwuGlobe() {
           ctx.fillStyle = `rgba(${BODY_COLOR[0]},${BODY_COLOR[1]},${BODY_COLOR[2]},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
         }
+      }
+
+      // Render flung orbiters (not depth-sorted, they're flying away)
+      for (const o of orbiters) {
+        if (o.state !== "flung") continue;
+        o.screenX += o.flungVx;
+        o.screenY += o.flungVy;
+        o.flungVx *= ORBIT_FLING_DRAG;
+        o.flungVy *= ORBIT_FLING_DRAG;
+        const ring = RING_CONFIGS[o.ringIndex];
+        ctx.font = `bold 14px ${FONT}`;
+        ctx.fillStyle = `rgba(${ring.color[0]},${ring.color[1]},${ring.color[2]},0.8)`;
+        ctx.fillText(o.char, o.screenX, o.screenY);
       }
 
       rafRef.current = requestAnimationFrame(frame);
