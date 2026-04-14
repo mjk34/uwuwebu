@@ -202,6 +202,63 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
   return stars;
 }
 
+// --- Face masks ---
+// Each mask classifies a front-facing particle into a role.
+// Only operates on particles with bz > 0.6 (front hemisphere).
+
+function maskNormal(p: Particle): ParticleRole {
+  if (p.baseTp === 2) return "cheek";
+  if (p.baseTp === 1 && p.by < EYE_MOUTH_Y_SPLIT) return "eye";
+  if (p.baseTp === 1) return "mouth";
+  return "body";
+}
+
+function maskDizzy(p: Particle): ParticleRole {
+  if (p.bz < 0.6) return "body";
+  // Cheeks — same regions as normal
+  if (p.baseTp === 2) return "cheek";
+  // @ eyes — annulus test at each eye center
+  const dlx = Math.sqrt((p.bx - LEFT_EYE_CX) ** 2 + (p.by - EYE_CY) ** 2);
+  const drx = Math.sqrt((p.bx - RIGHT_EYE_CX) ** 2 + (p.by - EYE_CY) ** 2);
+  if ((dlx > EYE_INNER_R && dlx < EYE_OUTER_R) ||
+      (drx > EYE_INNER_R && drx < EYE_OUTER_R)) return "eye";
+  // ~ mouth — sine wave band
+  const waveY = MOUTH_CY + WAVE_AMPLITUDE * Math.sin(p.bx * WAVE_FREQUENCY);
+  if (Math.abs(p.by - waveY) < WAVE_BAND && Math.abs(p.bx) < 0.35) return "mouth";
+  return "body";
+}
+
+function maskDistressed(p: Particle): ParticleRole {
+  if (p.bz < 0.6) return "body";
+  // Cheeks — same regions as normal
+  if (p.baseTp === 2) return "cheek";
+  // > left eye — two diagonal lines meeting at tip (rightward-pointing chevron)
+  const ldx = p.bx - LEFT_EYE_CX;
+  const ldy = p.by - EYE_CY;
+  if (ldx < 0.01 && (
+    Math.abs(ldy - CHEVRON_SLOPE * ldx) < CHEVRON_LINE_W ||
+    Math.abs(ldy + CHEVRON_SLOPE * ldx) < CHEVRON_LINE_W
+  )) return "eye";
+  // < right eye — mirrored (leftward-pointing chevron)
+  const rdx = p.bx - RIGHT_EYE_CX;
+  const rdy = p.by - EYE_CY;
+  if (rdx > -0.01 && (
+    Math.abs(rdy - CHEVRON_SLOPE * (-rdx)) < CHEVRON_LINE_W ||
+    Math.abs(rdy + CHEVRON_SLOPE * (-rdx)) < CHEVRON_LINE_W
+  )) return "eye";
+  // _ mouth — horizontal flat line
+  if (Math.abs(p.by - MOUTH_CY) < FLAT_MOUTH_LW && Math.abs(p.bx) < FLAT_MOUTH_HW) return "mouth";
+  return "body";
+}
+
+function applyMask(particles: Particle[], state: FaceState): void {
+  const fn = state === "dizzy" ? maskDizzy
+    : state === "distressed" ? maskDistressed
+    : maskNormal;
+  for (let i = 0; i < particles.length; i++) {
+    particles[i].role = fn(particles[i]);
+  }
+}
 
 export default function UwuGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
