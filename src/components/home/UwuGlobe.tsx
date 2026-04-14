@@ -297,6 +297,40 @@ export default function UwuGlobe() {
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
     let dragDx = 0, dragDy = 0;
 
+    // --- Face state ---
+    let faceState: FaceState = "normal";
+    let cumulativeSpin = 0;
+    let dragFrames = 0;
+    let jerkAccum = 0;
+    let cooldownTimer: number | null = null;
+    let wobbleStart = 0;
+    let colorLerpStart = 0;
+    let prevFaceState: FaceState = "normal";
+
+    const setFaceState = (next: FaceState) => {
+      if (next === faceState) return;
+      prevFaceState = faceState;
+      colorLerpStart = performance.now();
+      faceState = next;
+      applyMask(particles, next);
+      if (next === "dizzy") {
+        spinVelocity = 0;
+        // Snap face to front — nearest multiple of 2*PI
+        autoRotY = Math.round(autoRotY / (2 * Math.PI)) * 2 * Math.PI;
+        wobbleStart = performance.now();
+        cooldownTimer = window.setTimeout(() => {
+          setFaceState("normal");
+          cooldownTimer = null;
+        }, COOLDOWN_DURATION);
+      }
+      if (next === "normal") {
+        spinVelocity = DEF_VY;
+        cumulativeSpin = 0;
+        dragFrames = 0;
+        jerkAccum = 0;
+      }
+    };
+
     const resize = () => {
       const r = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
@@ -347,6 +381,33 @@ export default function UwuGlobe() {
           autoRotY += spinVelocity;
         }
         rotX += (DEF_RX - rotX) * 0.035;
+      }
+
+      // --- Face state triggers ---
+      cumulativeSpin += Math.abs(spinVelocity);
+      cumulativeSpin *= SPIN_DECAY;
+
+      if (dragging) {
+        dragFrames++;
+        jerkAccum += Math.abs(dragDx) + Math.abs(dragDy);
+        jerkAccum *= JERK_DECAY;
+      }
+
+      // Distressed takes priority (active grab)
+      if (faceState === "normal" && dragging &&
+          (dragFrames > DRAG_DURATION_THRESHOLD || jerkAccum > JERK_THRESHOLD)) {
+        setFaceState("distressed");
+      } else if (faceState === "normal" && !dragging &&
+                 cumulativeSpin > DIZZY_THRESHOLD) {
+        setFaceState("dizzy");
+      }
+
+      // Wobble (dizzy only)
+      if (faceState === "dizzy") {
+        const we = (performance.now() - wobbleStart) / 1000;
+        const decay = Math.exp(-we * WOBBLE_DAMPING);
+        rotX = DEF_RX + Math.sin(we * WOBBLE_FREQ_X) * WOBBLE_AMP_X * decay;
+        rotY = Math.cos(we * WOBBLE_FREQ_Y) * WOBBLE_AMP_Y * decay;
       }
 
       ctx.clearRect(0, 0, W, H);
@@ -574,7 +635,16 @@ export default function UwuGlobe() {
       dragDy = dy;
     };
 
-    const onMouseUp = () => { dragging = false; };
+    const onMouseUp = () => {
+      dragging = false;
+      if (faceState === "distressed" && cooldownTimer === null) {
+        cooldownTimer = window.setTimeout(() => {
+          setFaceState("normal");
+          cooldownTimer = null;
+        }, COOLDOWN_DURATION);
+      }
+      dragFrames = 0;
+    };
     const onMouseLeave = () => { mouseActive = false; };
 
     // Touch support
@@ -611,7 +681,17 @@ export default function UwuGlobe() {
       if (dragging) e.preventDefault();
     };
 
-    const onTouchEnd = () => { dragging = false; mouseActive = false; };
+    const onTouchEnd = () => {
+      dragging = false;
+      mouseActive = false;
+      if (faceState === "distressed" && cooldownTimer === null) {
+        cooldownTimer = window.setTimeout(() => {
+          setFaceState("normal");
+          cooldownTimer = null;
+        }, COOLDOWN_DURATION);
+      }
+      dragFrames = 0;
+    };
 
     resize();
     window.addEventListener("resize", resize);
@@ -626,6 +706,7 @@ export default function UwuGlobe() {
     rafRef.current = requestAnimationFrame(frame);
 
     return () => {
+      if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
       cancelAnimationFrame(rafRef.current);
       motionMql.removeEventListener("change", onMotionChange);
       window.removeEventListener("resize", resize);
