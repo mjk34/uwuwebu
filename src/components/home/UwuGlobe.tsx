@@ -31,35 +31,21 @@ const STAR_CHARS = [".", "·", "*", "✦"];
 const SPARKLE_SEQ = [".", "·", "*", "✦", "*", "·", "."];
 const SPARKLE_DURATION = 1.2; // seconds
 const SPARKLE_STEP = SPARKLE_DURATION / SPARKLE_SEQ.length;
-const SPARKLE_COOLDOWN_MIN = 1.0;
-const SPARKLE_COOLDOWN_MAX = 3.0;
-const SPARKLE_INTERVAL_MIN = 0.8;
-const SPARKLE_INTERVAL_MAX = 1.5;
+const SPARKLE_COOLDOWN_MIN = 0.3;
+const SPARKLE_COOLDOWN_MAX = 1.0;
+const SPARKLE_INTERVAL_MIN = 0.2;
+const SPARKLE_INTERVAL_MAX = 0.5;
 const STAR_DRIFT_AMP = 4;   // px
 const STAR_DRIFT_FREQ = 0.4; // Hz
 const STAR_PARALLAX = 0.2;
 const STAR_SPRING = 0.015;
 const STAR_DAMPING = 0.94;
 const STAR_MAX_DISP = 20;
-const STAR_EXCLUSION = 1.3;  // × globe radius
+const STAR_EXCLUSION = 1.15;  // × globe radius (outside globe + padding for glyph size)
 const STAR_COLORS: [number, number, number][] = [
   [255, 255, 255],
   [199, 179, 255],
 ];
-
-// --- Orbital rings ---
-const ORBIT_CHARS = ["UwU", "OwO", ">w<", "^w^", ":3", "@", "#", "$"];
-const RING_CONFIGS = [
-  { rx: 1.15, ry: 0.28, tilt: -15 * Math.PI / 180, speed: 0.00096 * 1.8, count: 3, color: [20, 255, 200] as [number, number, number] },
-  { rx: 1.45, ry: 0.32, tilt: -30 * Math.PI / 180, speed: 0.00096 * 1.3, count: 2, color: [255, 120, 180] as [number, number, number] },
-];
-const ORBIT_CAPTURE_DIST = 80;
-const ORBIT_RELEASE_DIST = 120;
-const ORBIT_MOUSE_SPEED = 4; // rad/s
-const ORBIT_CAPTURE_DECAY_TARGET = 30;
-const ORBIT_FLING_THRESHOLD = 8; // px/frame
-const ORBIT_FLING_DRAG = 0.98;
-const ORBIT_OFFSCREEN_MARGIN = 50;
 
 type Star = {
   bx: number; by: number;
@@ -74,20 +60,9 @@ type Star = {
   alpha: number;
   sparkleTime: number;
   cooldown: number;
+  depth: number; // 0=close to globe (more parallax), 1=far (less parallax)
 };
 
-type Orbiter = {
-  ringIndex: number;
-  theta: number;
-  char: string;
-  state: "orbiting" | "captured" | "flung";
-  dx: number; dy: number;
-  vx: number; vy: number;
-  captureAngle: number;
-  captureRadius: number;
-  flungVx: number; flungVy: number;
-  screenX: number; screenY: number;
-};
 
 type Particle = {
   bx: number; by: number; bz: number;
@@ -121,15 +96,27 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
   const cy = H / 2;
   const exclusion = globeRadius * STAR_EXCLUSION;
 
+  const maxDist = globeRadius * 1.8; // stars stay within this radius of center
+
+  // Scale star font size based on viewport — smaller on mobile
+  const viewMin = Math.min(W, H);
+  const fontBase = viewMin < 500 ? 24 : 50;
+  const fontRange = viewMin < 500 ? 16 : 30;
+
   for (let i = 0; i < STAR_COUNT; i++) {
     let x: number, y: number;
     do {
-      x = Math.random() * W;
-      y = Math.random() * H;
-    } while (Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) < exclusion);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = exclusion + Math.random() * (maxDist - exclusion);
+      x = cx + Math.cos(angle) * dist;
+      y = cy + Math.sin(angle) * dist;
+    } while (x < 0 || x > W || y < 0 || y > H);
 
     const color = STAR_COLORS[Math.random() < 0.5 ? 0 : 1];
     const baseCh = STAR_CHARS[(Math.random() * STAR_CHARS.length) | 0];
+    const distFromCenter = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+    // depth: 0 = closest to globe, 1 = farthest
+    const depth = Math.min(1, (distFromCenter - exclusion) / (maxDist - exclusion));
 
     stars.push({
       bx: x, by: y,
@@ -139,62 +126,18 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
       phaseY: Math.random() * Math.PI * 2,
       ch: baseCh,
       baseCh,
-      fontSize: 8 + Math.random() * 4,
+      fontSize: fontBase + Math.random() * fontRange,
       color,
       baseAlpha: 0.2 + Math.random() * 0.3,
       alpha: 0.2 + Math.random() * 0.3,
-      sparkleTime: -1,
-      cooldown: Math.random() * 3,
+      sparkleTime: Math.random() < 0.15 ? 0 : -1, // some start sparkling immediately
+      cooldown: Math.random() * 1.5,
+      depth,
     });
   }
   return stars;
 }
 
-function buildOrbiters(): Orbiter[] {
-  const orbiters: Orbiter[] = [];
-  for (let r = 0; r < RING_CONFIGS.length; r++) {
-    const ring = RING_CONFIGS[r];
-    const usedChars: string[] = [];
-    for (let i = 0; i < ring.count; i++) {
-      let ch: string;
-      do {
-        ch = ORBIT_CHARS[(Math.random() * ORBIT_CHARS.length) | 0];
-      } while (usedChars.includes(ch));
-      usedChars.push(ch);
-
-      orbiters.push({
-        ringIndex: r,
-        theta: (i / ring.count) * Math.PI * 2,
-        char: ch,
-        state: "orbiting",
-        dx: 0, dy: 0,
-        vx: 0, vy: 0,
-        captureAngle: 0,
-        captureRadius: 0,
-        flungVx: 0, flungVy: 0,
-        screenX: 0, screenY: 0,
-      });
-    }
-  }
-  return orbiters;
-}
-
-function respawnOrbiter(o: Orbiter, orbiters: Orbiter[]): void {
-  const ringmates = orbiters.filter(r => r.ringIndex === o.ringIndex && r !== o).map(r => r.char);
-  let ch: string;
-  do {
-    ch = ORBIT_CHARS[(Math.random() * ORBIT_CHARS.length) | 0];
-  } while (ringmates.includes(ch));
-
-  o.char = ch;
-  o.state = "orbiting";
-  o.theta = Math.PI / 2 + (Math.random() - 0.5) * 0.5;
-  o.dx = 0; o.dy = 0;
-  o.vx = 0; o.vy = 0;
-  o.captureAngle = 0;
-  o.captureRadius = 0;
-  o.flungVx = 0; o.flungVy = 0;
-}
 
 export default function UwuGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -217,11 +160,7 @@ export default function UwuGlobe() {
     let spinVelocity = DEF_VY;
     let mouseX = -9000, mouseY = -9000, mouseActive = false;
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
-    const orbiters = buildOrbiters();
     let dragDx = 0, dragDy = 0;
-    const mouseVxHist: number[] = [0, 0, 0];
-    const mouseVyHist: number[] = [0, 0, 0];
-    let prevMouseX = -9000, prevMouseY = -9000;
 
     const resize = () => {
       const r = container.getBoundingClientRect();
@@ -280,23 +219,30 @@ export default function UwuGlobe() {
       // --- Star field update & render ---
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      // Trigger new sparkles
+      // Trigger new sparkles (single pass — no .filter())
       if (!reduced) {
-        const activeSparkles = stars.filter(s => s.sparkleTime >= 0).length;
-        if (activeSparkles < 2) {
-          const eligible = stars.filter(s => s.sparkleTime < 0 && s.cooldown <= 0);
-          if (eligible.length > 0 && Math.random() < 1 / (60 * (SPARKLE_INTERVAL_MIN + Math.random() * (SPARKLE_INTERVAL_MAX - SPARKLE_INTERVAL_MIN)))) {
-            const pick = eligible[(Math.random() * eligible.length) | 0];
-            pick.sparkleTime = 0;
+        let activeSparkles = 0;
+        let eligibleCount = 0;
+        let eligiblePick = -1;
+        for (let i = 0; i < stars.length; i++) {
+          if (stars[i].sparkleTime >= 0) { activeSparkles++; }
+          else if (stars[i].cooldown <= 0) {
+            eligibleCount++;
+            if (Math.random() < 1 / eligibleCount) eligiblePick = i;
           }
+        }
+        if (activeSparkles < 6 && eligiblePick >= 0 &&
+            Math.random() < 1 / (60 * (SPARKLE_INTERVAL_MIN + Math.random() * (SPARKLE_INTERVAL_MAX - SPARKLE_INTERVAL_MIN)))) {
+          stars[eligiblePick].sparkleTime = 0;
         }
       }
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
 
-        // Drag parallax response
-        s.vx += dragDx * STAR_PARALLAX;
-        s.vy += dragDy * STAR_PARALLAX;
+        // Drag parallax response — close stars move more, far stars move less
+        const parallax = 0.35 - s.depth * 0.25; // close=0.35, far=0.10
+        s.vx += dragDx * parallax;
+        s.vy += dragDy * parallax;
 
         // Spring-back
         s.vx -= s.dx * STAR_SPRING;
@@ -338,12 +284,30 @@ export default function UwuGlobe() {
         const fx = s.bx + s.dx + driftX;
         const fy = s.by + s.dy + driftY;
 
+        // Hide stars that drift behind the globe
+        const distFromCenter = Math.sqrt((fx - W / 2) ** 2 + (fy - H / 2) ** 2);
+        const globeR = Math.min(W, H, 700) * 0.38;
+        if (distFromCenter < globeR) continue;
+
         ctx.font = `${s.fontSize.toFixed(1)}px ${FONT}`;
         ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${s.alpha.toFixed(2)})`;
         ctx.fillText(s.ch, fx, fy);
       }
-      const projected: { i: number; sx: number; sy: number; sz: number; sc: number }[] = [];
+
+      // Dark circle behind globe to mask the dot grid background
       const globeRadius = Math.min(W, H, 700) * 0.38;
+      const gcx = W / 2, gcy = H / 2;
+      const maskR = globeRadius * 1.05;
+      const grad = ctx.createRadialGradient(gcx, gcy, globeRadius * 0.6, gcx, gcy, maskR);
+      grad.addColorStop(0, "rgba(13,14,20,1)");
+      grad.addColorStop(0.85, "rgba(13,14,20,0.95)");
+      grad.addColorStop(1, "rgba(13,14,20,0)");
+      ctx.beginPath();
+      ctx.arc(gcx, gcy, maskR, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      const projected: { i: number; sx: number; sy: number; sz: number; sc: number }[] = [];
 
       // Unproject mouse onto sphere surface, then to world space
       const base = Math.min(W, H, 700);
@@ -402,114 +366,7 @@ export default function UwuGlobe() {
         projected.push({ i, sx, sy, sz, sc });
       }
 
-      // --- Orbiter position computation ---
-      for (let i = 0; i < orbiters.length; i++) {
-        const o = orbiters[i];
-        if (o.state === "flung") continue; // handled separately
-
-        const ring = RING_CONFIGS[o.ringIndex];
-
-        if (o.state === "orbiting" && !reduced) {
-          o.theta += ring.speed;
-        }
-
-        // Ellipse position in ring-local coords
-        const ex = Math.cos(o.theta) * ring.rx * globeRadius;
-        const ey = Math.sin(o.theta) * ring.ry * globeRadius;
-
-        // Apply ring tilt (rotation around X axis in 2D → gives y,z from ey)
-        const cosT = Math.cos(ring.tilt);
-        const sinT = Math.sin(ring.tilt);
-        const oy = ey * cosT;
-        const oz = ey * sinT;
-
-        // Drag spring-back (same physics as stars)
-        o.vx += dragDx * STAR_PARALLAX;
-        o.vy += dragDy * STAR_PARALLAX;
-        o.vx -= o.dx * STAR_SPRING;
-        o.vy -= o.dy * STAR_SPRING;
-        o.vx *= STAR_DAMPING;
-        o.vy *= STAR_DAMPING;
-        o.dx += o.vx;
-        o.dy += o.vy;
-        const odm = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
-        if (odm > STAR_MAX_DISP) {
-          o.dx *= STAR_MAX_DISP / odm;
-          o.dy *= STAR_MAX_DISP / odm;
-        }
-
-        const sx = W / 2 + ex + o.dx;
-        const sy = H / 2 + oy + o.dy;
-
-        o.screenX = sx;
-        o.screenY = sy;
-
-        // Push into projected array for depth sorting with globe particles
-        projected.push({ i: -(i + 1), sx, sy, sz: oz, sc: globeRadius * 0.04 });
-      }
-
-      // --- Mouse capture & fling ---
-      if (!reduced) {
-        const avgVx = mouseVxHist.reduce((a, b) => a + b, 0) / mouseVxHist.length;
-        const avgVy = mouseVyHist.reduce((a, b) => a + b, 0) / mouseVyHist.length;
-        const mouseSpeed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
-
-        for (let i = 0; i < orbiters.length; i++) {
-          const o = orbiters[i];
-
-          if (o.state === "flung") {
-            // Check if off-screen
-            if (o.screenX < -ORBIT_OFFSCREEN_MARGIN || o.screenX > W + ORBIT_OFFSCREEN_MARGIN ||
-                o.screenY < -ORBIT_OFFSCREEN_MARGIN || o.screenY > H + ORBIT_OFFSCREEN_MARGIN) {
-              respawnOrbiter(o, orbiters);
-            }
-            continue;
-          }
-
-          if (!mouseActive) {
-            if (o.state === "captured") o.state = "orbiting";
-            continue;
-          }
-
-          const distToMouse = Math.sqrt((o.screenX - mouseX) ** 2 + (o.screenY - mouseY) ** 2);
-
-          if (o.state === "orbiting") {
-            if (distToMouse < ORBIT_CAPTURE_DIST && mouseActive) {
-              o.state = "captured";
-              o.captureAngle = Math.atan2(o.screenY - mouseY, o.screenX - mouseX);
-              o.captureRadius = distToMouse;
-            }
-          } else if (o.state === "captured") {
-            if (mouseSpeed > ORBIT_FLING_THRESHOLD) {
-              o.state = "flung";
-              o.flungVx = avgVx;
-              o.flungVy = avgVy;
-              continue;
-            }
-
-            if (distToMouse > ORBIT_RELEASE_DIST) {
-              o.state = "orbiting";
-              continue;
-            }
-
-            // Orbit around mouse
-            o.captureAngle += ORBIT_MOUSE_SPEED / 60;
-            o.captureRadius += (ORBIT_CAPTURE_DECAY_TARGET - o.captureRadius) * 0.05;
-            o.screenX = mouseX + Math.cos(o.captureAngle) * o.captureRadius;
-            o.screenY = mouseY + Math.sin(o.captureAngle) * o.captureRadius;
-
-            // Update projected entry for this orbiter
-            const projIdx = projected.findIndex(p => p.i === -(i + 1));
-            if (projIdx >= 0) {
-              projected[projIdx].sx = o.screenX;
-              projected[projIdx].sy = o.screenY;
-              projected[projIdx].sz = -1; // force to front when captured
-            }
-          }
-        }
-      }
-
-      // Reset drag delta each frame (consumed by stars and orbiters)
+      // Reset drag delta each frame (consumed by stars)
       dragDx = 0;
       dragDy = 0;
 
@@ -519,27 +376,6 @@ export default function UwuGlobe() {
       ctx.textBaseline = "middle";
 
       for (const pr of projected) {
-        // Orbiter rendering
-        if (pr.i < 0) {
-          const oi = -(pr.i + 1);
-          const o = orbiters[oi];
-          if (o.state !== "orbiting" && o.state !== "captured") continue;
-          const ring = RING_CONFIGS[o.ringIndex];
-          const facing = Math.max(0, (-pr.sz + 0.3 * globeRadius) / (0.6 * globeRadius));
-          if (facing < 0.05) continue;
-          const al = Math.min(1, facing);
-          const fs = 14 + (pr.sz < 0 ? 2 : 0);
-          // Glow layer
-          ctx.font = `bold ${(fs + 2).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${ring.color[0]},${ring.color[1]},${ring.color[2]},${(al * 0.2).toFixed(2)})`;
-          ctx.fillText(o.char, pr.sx, pr.sy);
-          // Main layer
-          ctx.font = `bold ${fs.toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${ring.color[0]},${ring.color[1]},${ring.color[2]},${al.toFixed(2)})`;
-          ctx.fillText(o.char, pr.sx, pr.sy);
-          continue;
-        }
-
         const p = particles[pr.i];
         const facing = Math.max(0, (-pr.sz + 0.4) * 2.5);
         if (facing < 0.02) continue;
@@ -567,19 +403,6 @@ export default function UwuGlobe() {
         }
       }
 
-      // Render flung orbiters (not depth-sorted, they're flying away)
-      for (const o of orbiters) {
-        if (o.state !== "flung") continue;
-        o.screenX += o.flungVx;
-        o.screenY += o.flungVy;
-        o.flungVx *= ORBIT_FLING_DRAG;
-        o.flungVy *= ORBIT_FLING_DRAG;
-        const ring = RING_CONFIGS[o.ringIndex];
-        ctx.font = `bold 14px ${FONT}`;
-        ctx.fillStyle = `rgba(${ring.color[0]},${ring.color[1]},${ring.color[2]},0.8)`;
-        ctx.fillText(o.char, o.screenX, o.screenY);
-      }
-
       rafRef.current = requestAnimationFrame(frame);
     };
 
@@ -595,15 +418,6 @@ export default function UwuGlobe() {
       mouseX = e.clientX - r.left;
       mouseY = e.clientY - r.top;
       mouseActive = mouseX >= 0 && mouseX <= r.width && mouseY >= 0 && mouseY <= r.height;
-
-      if (prevMouseX > -1000) {
-        mouseVxHist.push(e.clientX - prevMouseX);
-        mouseVyHist.push(e.clientY - prevMouseY);
-        if (mouseVxHist.length > 3) mouseVxHist.shift();
-        if (mouseVyHist.length > 3) mouseVyHist.shift();
-      }
-      prevMouseX = e.clientX;
-      prevMouseY = e.clientY;
 
       if (!dragging) return;
       const dx = e.clientX - lastX, dy = e.clientY - lastY;

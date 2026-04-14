@@ -24,7 +24,7 @@ export default function HomePage() {
       <BgMusic />
       <HeroSection />
       <UwuGlobe />
-      <footer className="relative z-[2] mt-auto border-t border-fg-dim/20 px-8 py-3 font-mono text-[10px] uppercase tracking-[0.3em] text-fg-dim sm:px-14 lg:px-20">
+      <footer className="relative z-[2] mt-auto border-t border-fg-dim/20 px-4 py-2 font-mono text-[8px] uppercase tracking-[0.15em] text-fg-dim sm:px-14 sm:py-3 sm:text-[10px] sm:tracking-[0.3em] lg:px-20">
         {"// UWUVERSITY / NON-ACCREDITED / 2026"}
       </footer>
     </main>

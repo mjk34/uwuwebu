@@ -15,6 +15,7 @@
 }
 
 @theme inline {
+  --breakpoint-xs: 28rem;
   --color-bg-deep: var(--bg-deep);
   --color-bg-raised: var(--bg-raised);
   --color-bg-elevated: var(--bg-elevated);

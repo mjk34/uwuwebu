@@ -7,9 +7,9 @@ const CYAN: [number, number, number] = [0, 240, 255];
 
 const GAP = 44;
 const DOT_R = 0.8;
-const WAVE_SPEED = 120;     // px/s — how fast the pulse expands
+const WAVE_SPEED = 180;     // px/s — how fast the pulse expands
 const WAVE_WIDTH = 200;     // px — width of the soft ring
-const WAVE_INTERVAL = 8.0;  // seconds between pulses
+const WAVE_INTERVAL = 6.0;  // seconds between pulses
 const DISPLACE = 6;         // max displacement px
 
 type Dot = { bx: number; by: number; op: number };
