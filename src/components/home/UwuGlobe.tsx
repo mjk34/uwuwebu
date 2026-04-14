@@ -600,33 +600,6 @@ export default function UwuGlobe() {
 
       projected.sort((a, b) => a.sz - b.sz);
 
-      // Stress mark particles (distressed only)
-      if (faceState === "distressed") {
-        const stressPulse = 0.8 + Math.sin(t * 8) * 0.2;
-        for (let si = 0; si < STRESS_POSITIONS.length; si++) {
-          const sp = STRESS_POSITIONS[si];
-          const [srx, sry, srz] = rotate3D(sp[0], sp[1], sp[2]);
-          const [ssx, ssy, ssz, ssc] = project(srx, sry, srz);
-          // Only render if front-facing
-          if (srz < 0.4) {
-            const sFacing = Math.max(0, (-ssz + 0.4) * 2.5);
-            if (sFacing > 0.02) {
-              const sfs = Math.max(7, Math.min(18, ssc * 0.09)) * 1.2;
-              const sal = Math.min(sFacing, 1) * stressPulse;
-              const sCh = STRESS_CHARS[(Math.random() * STRESS_CHARS.length) | 0];
-              // Glow layer
-              ctx.font = `bold ${(sfs * 1.4).toFixed(1)}px ${FONT}`;
-              ctx.fillStyle = `rgba(${STRESS_COLOR[0]},${STRESS_COLOR[1]},${STRESS_COLOR[2]},${(sal * 0.3).toFixed(2)})`;
-              ctx.fillText(sCh, ssx, ssy);
-              // Sharp layer
-              ctx.font = `bold ${sfs.toFixed(1)}px ${FONT}`;
-              ctx.fillStyle = `rgba(${STRESS_COLOR[0]},${STRESS_COLOR[1]},${STRESS_COLOR[2]},${sal.toFixed(2)})`;
-              ctx.fillText(sCh, ssx, ssy);
-            }
-          }
-        }
-      }
-
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
@@ -688,6 +661,33 @@ export default function UwuGlobe() {
           ctx.font = `${fs.toFixed(1)}px ${FONT}`;
           ctx.fillStyle = `rgba(${bodyColor[0] | 0},${bodyColor[1] | 0},${bodyColor[2] | 0},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
+        }
+      }
+
+      // Stress mark particles (distressed only) — rendered after globe particles so they appear on top
+      if (faceState === "distressed") {
+        const stressPulse = 0.8 + Math.sin(t * 8) * 0.2;
+        for (let si = 0; si < STRESS_POSITIONS.length; si++) {
+          const sp = STRESS_POSITIONS[si];
+          const [srx, sry, srz] = rotate3D(sp[0], sp[1], sp[2]);
+          const [ssx, ssy, ssz, ssc] = project(srx, sry, srz);
+          // Only render if front-facing
+          if (srz < 0.4) {
+            const sFacing = Math.max(0, (-ssz + 0.4) * 2.5);
+            if (sFacing > 0.02) {
+              const sfs = Math.max(7, Math.min(18, ssc * 0.09)) * 1.2;
+              const sal = Math.min(sFacing, 1) * stressPulse;
+              const sCh = STRESS_CHARS[(Math.random() * STRESS_CHARS.length) | 0];
+              // Glow layer
+              ctx.font = `bold ${(sfs * 1.4).toFixed(1)}px ${FONT}`;
+              ctx.fillStyle = `rgba(${STRESS_COLOR[0]},${STRESS_COLOR[1]},${STRESS_COLOR[2]},${(sal * 0.3).toFixed(2)})`;
+              ctx.fillText(sCh, ssx, ssy);
+              // Sharp layer
+              ctx.font = `bold ${sfs.toFixed(1)}px ${FONT}`;
+              ctx.fillStyle = `rgba(${STRESS_COLOR[0]},${STRESS_COLOR[1]},${STRESS_COLOR[2]},${sal.toFixed(2)})`;
+              ctx.fillText(sCh, ssx, ssy);
+            }
+          }
         }
       }
 
