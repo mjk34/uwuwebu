@@ -28,10 +28,11 @@ export default function HackerModal({ onClose }: HackerModalProps) {
   const ctaRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Mark as seen so closing early still skips next time
+  // Mark as seen once boot animation finishes (not on mount)
+  // so strict-mode double-mount doesn't skip the animation
   useEffect(() => {
-    hasPlayedBoot = true;
-  }, []);
+    if (bootDone) hasPlayedBoot = true;
+  }, [bootDone]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

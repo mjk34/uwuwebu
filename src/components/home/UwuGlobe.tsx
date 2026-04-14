@@ -976,7 +976,7 @@ export default function UwuGlobe() {
         spinVelocity = dragTotalDx * FLICK_MULTIPLIER;
       }
       dragging = false;
-      if (faceState === "distressed" && !shaking) {
+      if (faceState === "distressed" && !shaking && !shakeLocked) {
         // User let go — cancel the 3s forced timer, shake in 0.5s
         if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
         cooldownTimer = window.setTimeout(() => {
@@ -1036,7 +1036,7 @@ export default function UwuGlobe() {
       }
       dragging = false;
       mouseActive = false;
-      if (faceState === "distressed" && !shaking) {
+      if (faceState === "distressed" && !shaking && !shakeLocked) {
         if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
         cooldownTimer = window.setTimeout(() => {
           cooldownTimer = null;
