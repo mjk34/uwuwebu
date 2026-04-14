@@ -96,12 +96,12 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
   const cy = H / 2;
   const exclusion = globeRadius * STAR_EXCLUSION;
 
-  const maxDist = globeRadius * 1.8; // stars stay within this radius of center
+  const maxDist = globeRadius * 2.2; // stars stay within this radius of center
 
   // Scale star font size based on viewport — smaller on mobile
   const viewMin = Math.min(W, H);
-  const fontBase = viewMin < 500 ? 24 : 50;
-  const fontRange = viewMin < 500 ? 16 : 30;
+  const fontBase = viewMin < 500 ? 40 : 80;
+  const fontRange = viewMin < 500 ? 20 : 40;
 
   for (let i = 0; i < STAR_COUNT; i++) {
     let x: number, y: number;
@@ -290,6 +290,14 @@ export default function UwuGlobe() {
         if (distFromCenter < globeR) continue;
 
         ctx.font = `${s.fontSize.toFixed(1)}px ${FONT}`;
+        // Glow layer when sparkling
+        if (s.sparkleTime >= 0) {
+          const glowAlpha = (s.alpha * 0.3).toFixed(2);
+          ctx.font = `${(s.fontSize * 1.6).toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${glowAlpha})`;
+          ctx.fillText(s.ch, fx, fy);
+          ctx.font = `${s.fontSize.toFixed(1)}px ${FONT}`;
+        }
         ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${s.alpha.toFixed(2)})`;
         ctx.fillText(s.ch, fx, fy);
       }

@@ -31,7 +31,7 @@ export default function BgMusic() {
 
     const startId = window.setTimeout(() => {
       audio.play().catch(() => {});
-    }, 1500);
+    }, 500);
 
     return () => {
       window.clearTimeout(startId);
