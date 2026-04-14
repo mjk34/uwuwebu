@@ -926,6 +926,7 @@ export default function UwuGlobe() {
     // Input handlers
     const onMouseDown = (e: MouseEvent) => {
       if (shakeLocked) return;
+      e.preventDefault(); // prevent text selection drag
       dragging = true;
       dragStartTime = performance.now();
       dragTotalDx = 0;
