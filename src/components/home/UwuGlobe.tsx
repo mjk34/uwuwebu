@@ -7,6 +7,19 @@ const BODY_COLOR: [number, number, number] = [250, 220, 120];
 const FACE_COLOR: [number, number, number] = [20, 255, 200];
 const FACE_GLOW: [number, number, number] = [20, 255, 180];
 const CHEEK_COLOR: [number, number, number] = [255, 120, 180];
+// --- Face state colors ---
+const BODY_COLOR_PALE: [number, number, number] = [255, 245, 180];
+const EYE_COLOR_WHITE: [number, number, number] = [255, 255, 255];
+const STRESS_COLOR: [number, number, number] = [255, 60, 60];
+const STRESS_CHARS = ["#", "+", "*"];
+// Distressed gradient stops (top → middle → bottom by rotated Y)
+const ANGRY_TOP: [number, number, number] = [255, 80, 100];
+const ANGRY_MID: [number, number, number] = [255, 160, 90];
+const ANGRY_BOT: [number, number, number] = [255, 210, 130];
+
+type FaceState = "normal" | "dizzy" | "distressed";
+type ParticleRole = "body" | "eye" | "mouth" | "cheek";
+
 const FONT_FALLBACKS = "'SF Mono', 'Fira Code', 'Courier New', monospace";
 
 const DEF_RX = -0.1;
@@ -20,6 +33,50 @@ const SPRING_BACK = 0.015;
 const MAX_DISPLACEMENT = 0.15;
 const GLOBE_SCALE = 1;         // globe render scale
 const SPIN_DELAY = 1;         // seconds before auto-rotation starts
+// --- Face state triggers ---
+const DIZZY_THRESHOLD = 0.8;
+const SPIN_DECAY = 0.995;
+const DRAG_DURATION_THRESHOLD = 180; // frames (~3s at 60fps)
+const JERK_THRESHOLD = 50;
+const JERK_DECAY = 0.98;
+const COOLDOWN_DURATION = 3000; // ms
+const COLOR_LERP_DURATION = 300; // ms
+
+// --- Wobble ---
+const WOBBLE_DAMPING = 1.5;
+const WOBBLE_FREQ_X = 6;
+const WOBBLE_FREQ_Y = 7;
+const WOBBLE_AMP_X = 0.08;
+const WOBBLE_AMP_Y = 0.06;
+
+// --- Face mask geometry ---
+const LEFT_EYE_CX = -0.56;
+const RIGHT_EYE_CX = 0.56;
+const EYE_CY = 0.05;
+const MOUTH_CY = 0.22;
+const EYE_MOUTH_Y_SPLIT = 0.17; // Y threshold: eye (below) vs mouth (above)
+
+// Dizzy mask — @ eyes (annulus), ~ mouth (sine wave)
+const EYE_INNER_R = 0.05;
+const EYE_OUTER_R = 0.13;
+const WAVE_AMPLITUDE = 0.04;
+const WAVE_FREQUENCY = 8;
+const WAVE_BAND = 0.03;
+
+// Distressed mask — > < eyes (chevrons), _ mouth (flat line)
+const CHEVRON_SLOPE = 1.5;
+const CHEVRON_LINE_W = 0.025;
+const FLAT_MOUTH_HW = 0.15;
+const FLAT_MOUTH_LW = 0.02;
+
+// Stress mark positions (upper-right, on sphere surface)
+const STRESS_POSITIONS: [number, number, number][] = [
+  [0.40, -0.50, 0.77],   // center
+  [0.35, -0.58, 0.73],   // top arm
+  [0.45, -0.42, 0.79],   // bottom arm
+  [0.32, -0.47, 0.82],   // left arm
+  [0.48, -0.53, 0.70],   // right arm
+];
 
 const BODY_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789@#%&*+-~";
 const FACE_CHARS = ["U", "W", "#", "@", "%"];
@@ -68,7 +125,8 @@ type Particle = {
   bx: number; by: number; bz: number;
   dx: number; dy: number; dz: number;
   vx: number; vy: number; vz: number;
-  tp: number; ch: string;
+  tp: number; baseTp: number; ch: string;
+  role: ParticleRole;
   pulse: number; pulseSpeed: number;
 };
 
@@ -79,11 +137,17 @@ function buildParticles(): Particle[] {
     if (tp === 1) ch = FACE_CHARS[(Math.random() * FACE_CHARS.length) | 0];
     else if (tp === 2) ch = CHEEK_CHARS[(Math.random() * CHEEK_CHARS.length) | 0];
     else ch = BODY_CHARS[(Math.random() * BODY_CHARS.length) | 0];
+    // Distinguish eye vs mouth from tp=1 using Y threshold
+    let role: ParticleRole;
+    if (tp === 2) role = "cheek";
+    else if (tp === 1 && d[1] < EYE_MOUTH_Y_SPLIT) role = "eye";
+    else if (tp === 1) role = "mouth";
+    else role = "body";
     return {
       bx: d[0], by: d[1], bz: d[2],
       dx: 0, dy: 0, dz: 0,
       vx: 0, vy: 0, vz: 0,
-      tp, ch,
+      tp, baseTp: tp, ch, role,
       pulse: Math.random() * 6.28,
       pulseSpeed: Math.random() * 0.02 + 0.005,
     };
