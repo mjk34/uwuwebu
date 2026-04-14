@@ -475,7 +475,7 @@ export default function UwuGlobe() {
     let dragStartTime = 0;
     let dragTotalDx = 0;
     const FLICK_WINDOW = 500; // ms — quick grab threshold
-    const FLICK_MULTIPLIER = 0.003; // velocity boost for flicks
+    const FLICK_MULTIPLIER = 0.0012; // velocity boost for flicks
 
     // --- Face state ---
     let faceState: FaceState = "normal";
