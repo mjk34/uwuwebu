@@ -260,6 +260,30 @@ function applyMask(particles: Particle[], state: FaceState): void {
   }
 }
 
+function lerpColor(
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number,
+): [number, number, number] {
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+}
+
+// Distressed body gradient: top=red, mid=orange, bottom=golden based on rotated Y (-1..1)
+function angryBodyColor(ry: number): [number, number, number] {
+  // ry is rotated Y in -1..1 range. Map to 0..1 (top to bottom).
+  const t = (ry + 1) / 2; // 0=top, 1=bottom
+  if (t < 0.5) {
+    const lt = t / 0.5;
+    return lerpColor(ANGRY_TOP, ANGRY_MID, lt);
+  }
+  const lt = (t - 0.5) / 0.5;
+  return lerpColor(ANGRY_MID, ANGRY_BOT, lt);
+}
+
 export default function UwuGlobe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -511,7 +535,7 @@ export default function UwuGlobe() {
       ctx.fillStyle = grad;
       ctx.fill();
 
-      const projected: { i: number; sx: number; sy: number; sz: number; sc: number }[] = [];
+      const projected: { i: number; sx: number; sy: number; sz: number; sc: number; ry: number }[] = [];
 
       // Unproject mouse onto sphere surface, then to world space
       const base = Math.min(W, H, 700);
@@ -567,7 +591,7 @@ export default function UwuGlobe() {
           }
         }
 
-        projected.push({ i, sx, sy, sz, sc });
+        projected.push({ i, sx, sy, sz, sc, ry });
       }
 
       // Reset drag delta each frame (consumed by stars)
@@ -579,6 +603,9 @@ export default function UwuGlobe() {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
+      // Color lerp progress (0..1)
+      const lerpT = Math.min(1, (performance.now() - colorLerpStart) / COLOR_LERP_DURATION);
+
       for (const pr of projected) {
         const p = particles[pr.i];
         const facing = Math.max(0, (-pr.sz + 0.4) * 2.5);
@@ -587,22 +614,52 @@ export default function UwuGlobe() {
         const glow = 0.3 + Math.sin(p.pulse) * 0.1;
         const fs = Math.max(7, Math.min(18, pr.sc * 0.09));
 
-        if (p.tp === 1) {
+        if (p.role === "eye") {
+          const eyeColor = faceState === "dizzy" ? EYE_COLOR_WHITE : FACE_COLOR;
+          const eyeGlow = faceState === "dizzy" ? EYE_COLOR_WHITE : FACE_GLOW;
+          const al = Math.min(facing, 1) * (glow + 0.7);
+          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${eyeGlow[0]},${eyeGlow[1]},${eyeGlow[2]},${(al * 0.25).toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+          ctx.fillStyle = `rgba(${eyeColor[0]},${eyeColor[1]},${eyeColor[2]},${al.toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+        } else if (p.role === "mouth") {
           const al = Math.min(facing, 1) * (glow + 0.7);
           ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
           ctx.fillStyle = `rgba(${FACE_GLOW[0]},${FACE_GLOW[1]},${FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
           ctx.fillStyle = `rgba(${FACE_COLOR[0]},${FACE_COLOR[1]},${FACE_COLOR[2]},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
-        } else if (p.tp === 2) {
+        } else if (p.role === "cheek") {
           const al = Math.min(facing, 1) * (glow + 0.6);
           ctx.font = `bold ${(fs * 1.2).toFixed(1)}px ${FONT}`;
           ctx.fillStyle = `rgba(${CHEEK_COLOR[0]},${CHEEK_COLOR[1]},${CHEEK_COLOR[2]},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
         } else {
+          // Body — color depends on face state
+          let bodyColor: [number, number, number];
+          if (faceState === "distressed") {
+            bodyColor = angryBodyColor(pr.ry);
+          } else if (faceState === "dizzy") {
+            bodyColor = BODY_COLOR_PALE;
+          } else {
+            bodyColor = BODY_COLOR;
+          }
+          // Lerp from previous state's color if transitioning
+          if (lerpT < 1) {
+            let prevColor: [number, number, number];
+            if (prevFaceState === "distressed") {
+              prevColor = angryBodyColor(pr.ry);
+            } else if (prevFaceState === "dizzy") {
+              prevColor = BODY_COLOR_PALE;
+            } else {
+              prevColor = BODY_COLOR;
+            }
+            bodyColor = lerpColor(prevColor, bodyColor, lerpT);
+          }
           const al = Math.min(facing, 1) * (glow + 0.35);
           ctx.font = `${fs.toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${BODY_COLOR[0]},${BODY_COLOR[1]},${BODY_COLOR[2]},${al.toFixed(2)})`;
+          ctx.fillStyle = `rgba(${bodyColor[0] | 0},${bodyColor[1] | 0},${bodyColor[2] | 0},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
         }
       }
