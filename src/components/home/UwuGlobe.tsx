@@ -8,17 +8,21 @@ const FACE_COLOR: [number, number, number] = [20, 255, 200];
 const FACE_GLOW: [number, number, number] = [20, 255, 180];
 const CHEEK_COLOR: [number, number, number] = [255, 120, 180];
 // --- Face state colors ---
-const BODY_COLOR_PALE: [number, number, number] = [255, 245, 180];
-const EYE_COLOR_WHITE: [number, number, number] = [255, 255, 255];
-const STRESS_COLOR: [number, number, number] = [255, 60, 60];
-const STRESS_CHARS = ["#", "+", "*"];
-// Distressed gradient stops (top → middle → bottom by rotated Y)
-const ANGRY_TOP: [number, number, number] = [255, 80, 100];
-const ANGRY_MID: [number, number, number] = [255, 160, 90];
-const ANGRY_BOT: [number, number, number] = [255, 210, 130];
+const BODY_COLOR_PALE: [number, number, number] = [255, 245, 170];
+const DIZZY_FACE_COLOR: [number, number, number] = [255, 255, 255];
+const DIZZY_FACE_GLOW: [number, number, number] = [240, 240, 220];
+const DIZZY_CHEEK_COLOR: [number, number, number] = [20, 255, 220];
+const ANGRY_FACE_COLOR: [number, number, number] = [20, 255, 200];
+const ANGRY_FACE_GLOW: [number, number, number] = [20, 255, 180];
+const ANGRY_MARK_COLOR: [number, number, number] = [255, 60, 60];
+const ANGRY_MARK_GLOW: [number, number, number] = [255, 80, 70];
+// Distressed gradient stops — matches Facebook angry emoji (top → middle → bottom)
+const ANGRY_TOP: [number, number, number] = [240, 75, 95];
+const ANGRY_MID: [number, number, number] = [240, 150, 105];
+const ANGRY_BOT: [number, number, number] = [245, 200, 100];
 
 type FaceState = "normal" | "dizzy" | "distressed";
-type ParticleRole = "body" | "eye" | "mouth" | "cheek";
+type ParticleRole = "body" | "eye" | "mouth" | "cheek" | "hidden" | "angryface" | "stressmark" | "dizzyface" | "dizzycheek";
 
 const FONT_FALLBACKS = "'SF Mono', 'Fira Code', 'Courier New', monospace";
 
@@ -34,12 +38,16 @@ const MAX_DISPLACEMENT = 0.15;
 const GLOBE_SCALE = 1;         // globe render scale
 const SPIN_DELAY = 1;         // seconds before auto-rotation starts
 // --- Face state triggers ---
-const DIZZY_THRESHOLD = 0.8;
-const SPIN_DECAY = 0.995;
-const DRAG_DURATION_THRESHOLD = 180; // frames (~3s at 60fps)
-const JERK_THRESHOLD = 50;
-const JERK_DECAY = 0.98;
-const COOLDOWN_DURATION = 3000; // ms
+const DIZZY_THRESHOLD = 3 * 2 * Math.PI; // 3 full rotations
+const DRAG_DURATION_THRESHOLD = 480; // frames (~8s at 60fps)
+const JERK_THRESHOLD = 800;       // px/s sustained movement
+const DIRECTION_CHANGE_THRESHOLD = 5; // direction reversals while dragging
+const COOLDOWN_DURATION = 1500; // ms
+// --- Angry shake-off ---
+const SHAKE_DURATION = 2000;  // ms — head-shake before returning to normal
+const SHAKE_FREQ = 18;        // Hz — rapid left-right oscillation
+const SHAKE_AMP = 0.18;       // radians — shake amplitude
+const SHAKE_DAMPING = 2.5;    // exponential decay rate
 const COLOR_LERP_DURATION = 300; // ms
 
 // --- Wobble ---
@@ -50,33 +58,122 @@ const WOBBLE_AMP_X = 0.08;
 const WOBBLE_AMP_Y = 0.06;
 
 // --- Face mask geometry ---
-const LEFT_EYE_CX = -0.56;
-const RIGHT_EYE_CX = 0.56;
-const EYE_CY = 0.05;
+const LEFT_EYE_CX = -0.42;
+const RIGHT_EYE_CX = 0.42;
+const EYE_CY = 0.0;
 const MOUTH_CY = 0.22;
 const EYE_MOUTH_Y_SPLIT = 0.17; // Y threshold: eye (below) vs mouth (above)
 
-// Dizzy mask — @ eyes (annulus), ~ mouth (sine wave)
-const EYE_INNER_R = 0.05;
-const EYE_OUTER_R = 0.13;
-const WAVE_AMPLITUDE = 0.04;
-const WAVE_FREQUENCY = 8;
-const WAVE_BAND = 0.03;
+// Dizzy eye spin centers and speed
+const LEYE_CX = -0.3685, LEYE_CY = -0.0786;
+const REYE_CX = 0.3784, REYE_CY = -0.0903;
+const EYE_SPIN_SPEED = 1.2;
 
-// Distressed mask — > < eyes (chevrons), _ mouth (flat line)
-const CHEVRON_SLOPE = 1.5;
-const CHEVRON_LINE_W = 0.025;
-const FLAT_MOUTH_HW = 0.15;
-const FLAT_MOUTH_LW = 0.02;
-
-// Stress mark positions (upper-right, on sphere surface)
-const STRESS_POSITIONS: [number, number, number][] = [
-  [0.40, -0.50, 0.77],   // center
-  [0.35, -0.58, 0.73],   // top arm
-  [0.45, -0.42, 0.79],   // bottom arm
-  [0.32, -0.47, 0.82],   // left arm
-  [0.48, -0.53, 0.70],   // right arm
+// Dizzy face particles — @~@ spiral eyes and ~ mouth (baseTp=5)
+const DIZZY_FACE_DATA: [number, number, number][] = [
+  [-.343,-.274,.899],[.334,-.268,.904],[.376,-.268,.887],[-.471,-.252,.845],[-.448,-.252,.858],
+  [-.365,-.252,.897],[-.32,-.252,.914],[-.3,-.252,.92],[.312,-.246,.918],[.357,-.246,.901],
+  [.376,-.246,.893],[.421,-.246,.873],[.44,-.246,.864],[-.493,-.229,.839],[-.448,-.229,.864],
+  [-.278,-.229,.933],[.27,-.223,.937],[.312,-.223,.924],[.421,-.223,.879],[.462,-.223,.858],
+  [-.512,-.21,.833],[.228,-.204,.952],[-.535,-.187,.824],[-.236,-.187,.953],[.228,-.182,.957],
+  [.248,-.182,.952],[.485,-.182,.855],[-.557,-.165,.814],[-.535,-.165,.828],[-.407,-.165,.899],
+  [-.384,-.165,.909],[-.365,-.165,.917],[-.343,-.165,.925],[-.236,-.165,.958],[.205,-.159,.966],
+  [.334,-.159,.929],[.485,-.159,.86],[-.429,-.145,.892],[-.407,-.145,.902],[-.384,-.145,.912],
+  [-.365,-.145,.92],[-.214,-.145,.966],[.205,-.139,.969],[.357,-.139,.924],[.376,-.139,.916],
+  [.398,-.139,.907],[.505,-.139,.852],[-.557,-.123,.821],[-.471,-.123,.873],[-.429,-.123,.895],
+  [-.343,-.123,.931],[.205,-.117,.972],[.312,-.117,.943],[.485,-.117,.866],[.505,-.117,.855],
+  [-.214,-.1,.972],[.312,-.094,.945],[.462,-.094,.882],[.485,-.094,.869],[.569,-.094,.817],
+  [-.471,-.081,.878],[-.32,-.081,.944],[-.3,-.081,.95],[-.214,-.081,.973],[.205,-.075,.976],
+  [.485,-.075,.871],[.569,-.075,.819],[-.493,-.059,.868],[-.343,-.059,.938],[-.32,-.059,.946],
+  [-.191,-.059,.98],[.205,-.053,.977],[.312,-.053,.949],[.357,-.053,.933],[.462,-.053,.885],
+  [.569,-.053,.821],[-.493,-.036,.869],[-.471,-.036,.881],[-.384,-.036,.923],[-.365,-.036,.93],
+  [-.32,-.036,.947],[-.3,-.036,.953],[-.191,-.036,.981],[.205,-.03,.978],[.376,-.03,.926],
+  [.398,-.03,.917],[.55,-.03,.835],[-.384,-.017,.923],[-.365,-.017,.931],[-.343,-.017,.939],
+  [-.236,-.017,.972],[-.214,-.017,.977],[.228,-.011,.974],[.398,-.011,.917],[.55,-.011,.835],
+  [-.493,.005,.87],[-.471,.005,.882],[-.448,.005,.894],[-.255,.005,.967],[-.236,.005,.972],
+  [-.214,.005,.977],[.527,.011,.85],[-.471,.028,.882],[-.448,.028,.894],[-.429,.028,.903],
+  [-.278,.028,.96],[.27,.034,.962],[.293,.034,.956],[-.448,.048,.893],[-.384,.048,.922],
+  [-.3,.048,.953],[-.278,.048,.959],[.334,.053,.941],[.421,.053,.905],[.44,.053,.896],
+  [.462,.053,.885],[-.429,.07,.901],[-.407,.07,.911],[-.365,.07,.929],[-.343,.07,.937],
+  [-.32,.07,.945],[-.3,.07,.951],[.312,.075,.947],[.334,.075,.94],[.357,.075,.931],
+  [.376,.075,.924],[.398,.075,.914],[.462,.075,.883],
 ];
+const DIZZY_FACE_CHARS = ["@", "0", "O", "#", "%", "&"];
+
+// Dizzy cheek particles — wavy ~ line (baseTp=6)
+const DIZZY_CHEEK_DATA: [number, number, number][] = [
+  [-.22,.25,.943],[-.207,.247,.947],[-.194,.238,.952],[-.181,.226,.957],[-.168,.212,.963],
+  [-.155,.2,.967],[-.142,.192,.971],[-.129,.19,.973],[-.116,.194,.974],[-.104,.204,.973],
+  [-.091,.217,.972],[-.078,.231,.97],[-.065,.242,.968],[-.052,.249,.967],[-.039,.249,.968],
+  [-.026,.244,.969],[-.013,.233,.972],[0,.22,.975],[.013,.207,.978],[.026,.196,.98],
+  [.039,.191,.981],[.052,.191,.98],[.065,.198,.978],[.078,.209,.975],[.091,.223,.971],
+  [.104,.236,.966],[.116,.246,.962],[.129,.25,.96],[.142,.248,.958],[.155,.24,.958],
+  [.168,.228,.959],[.181,.214,.96],[.194,.202,.96],[.207,.193,.959],[.22,.19,.957],
+];
+
+// Angry face particles — brows, eyes, frown (left eye mirrored to right for symmetry)
+const ANGRY_FACE_DATA: [number, number, number][] = [
+  [-.526,-.028,.85],[-.478,.003,.878],[-.503,.023,.864],[-.456,.032,.889],[-.478,.051,.877],
+  [-.456,.055,.888],[-.41,.063,.91],[-.385,.068,.92],[-.339,.077,.938],[-.41,.086,.908],
+  [-.385,.091,.918],[-.362,.095,.927],[-.339,.1,.936],[-.317,.104,.943],[-.292,.108,.95],
+  [-.246,.117,.962],[-.223,.121,.967],[-.199,.126,.972],[-.176,.13,.976],[-.153,.134,.979],
+  [-.362,.118,.925],[-.339,.123,.933],[-.317,.127,.94],[-.292,.131,.947],[-.269,.136,.954],
+  [-.246,.14,.959],[-.223,.144,.964],[-.199,.149,.969],[-.176,.153,.972],[-.153,.157,.976],
+  [-.128,.162,.978],[-.106,.166,.98],[-.339,.147,.929],[-.317,.151,.936],[-.292,.155,.944],
+  [-.269,.16,.95],[-.246,.164,.955],[-.199,.173,.965],[-.176,.177,.968],[-.128,.186,.974],
+  [-.106,.19,.976],[-.339,.174,.924],[-.317,.174,.932],[-.292,.174,.94],[-.269,.174,.947],
+  [-.246,.174,.953],[-.317,.197,.928],[-.269,.197,.943],[-.339,.222,.914],[-.292,.222,.93],
+  [-.269,.222,.937],[.526,-.028,.85],[.478,.003,.878],[.503,.023,.864],[.456,.032,.889],
+  [.478,.051,.877],[.456,.055,.888],[.41,.063,.91],[.385,.068,.92],[.339,.077,.938],
+  [.41,.086,.908],[.385,.091,.918],[.362,.095,.927],[.339,.1,.935],[.317,.104,.943],
+  [.292,.108,.95],[.246,.117,.962],[.223,.121,.967],[.199,.126,.972],[.176,.13,.976],
+  [.153,.134,.979],[.362,.118,.925],[.339,.123,.933],[.317,.127,.94],[.292,.131,.947],
+  [.269,.136,.953],[.246,.14,.959],[.223,.144,.964],[.199,.149,.969],[.176,.153,.972],
+  [.153,.157,.976],[.128,.162,.978],[.106,.166,.98],[.339,.147,.929],[.317,.151,.936],
+  [.292,.155,.944],[.269,.16,.95],[.246,.164,.955],[.199,.173,.965],[.176,.177,.968],
+  [.128,.186,.974],[.106,.19,.976],[.339,.174,.925],[.317,.174,.932],[.292,.174,.94],
+  [.269,.174,.947],[.246,.174,.954],[.317,.197,.928],[.269,.197,.943],[.339,.222,.914],
+  [.292,.222,.93],[.269,.222,.937],
+  [-.125,.423,.897],[-.1,.413,.905],[-.075,.405,.911],[-.05,.4,.915],[-.025,.396,.918],
+  [0,.395,.919],[.025,.396,.918],[.05,.4,.915],[.075,.405,.911],[.1,.413,.905],
+  [.125,.423,.897],[-.1,.435,.895],[-.075,.427,.901],[-.05,.422,.905],[-.025,.418,.908],
+  [0,.417,.909],[.025,.418,.908],[.05,.422,.905],[.075,.427,.901],[.1,.435,.895],
+];
+const ANGRY_FACE_CHARS = ["X", "V", "#", "@", "%", "W"];
+
+// Angry stress mark particles — upper-right of globe, breathing pulse
+const ANGRY_MARK_DATA: [number, number, number][] = [
+  [.566,-.526,.635],[.555,-.515,.653],[.577,-.515,.634],[.566,-.504,.652],[.577,-.504,.643],
+  [.555,-.493,.67],[.566,-.493,.661],[.577,-.493,.651],[.632,-.493,.598],[.335,-.482,.81],
+  [.346,-.482,.805],[.533,-.482,.695],[.632,-.482,.607],[.643,-.482,.595],[.335,-.471,.816],
+  [.346,-.471,.811],[.533,-.471,.703],[.632,-.471,.615],[.335,-.46,.822],[.346,-.46,.818],
+  [.368,-.46,.808],[.379,-.46,.803],[.555,-.46,.693],[.599,-.46,.655],[.61,-.46,.645],
+  [.632,-.46,.624],[.335,-.449,.828],[.522,-.449,.725],[.533,-.449,.717],[.544,-.449,.709],
+  [.599,-.449,.663],[.357,-.438,.825],[.368,-.438,.82],[.401,-.427,.81],[.434,-.427,.793],
+  [.489,-.427,.761],[.522,-.427,.738],[.577,-.427,.696],[.302,-.416,.858],[.423,-.416,.805],
+  [.456,-.416,.787],[.577,-.416,.703],[.324,-.405,.855],[.335,-.405,.851],[.456,-.405,.792],
+  [.467,-.405,.786],[.566,-.405,.718],[.335,-.394,.856],[.357,-.394,.847],[.445,-.394,.804],
+  [.335,-.383,.861],[.357,-.383,.852],[.379,-.383,.842],[.577,-.383,.721],[.346,-.372,.861],
+  [.357,-.372,.857],[.566,-.372,.736],[.346,-.361,.866],[.357,-.361,.862],[.368,-.361,.857],
+  [.39,-.361,.847],[.401,-.361,.842],[.566,-.35,.746],[.39,-.339,.856],[.412,-.339,.846],
+  [.423,-.339,.84],[.588,-.339,.734],[.599,-.339,.725],[.423,-.328,.845],[.577,-.328,.748],
+  [.588,-.328,.739],[.599,-.328,.73],[.61,-.328,.721],[.401,-.317,.859],[.577,-.317,.753],
+  [.588,-.306,.749],[.599,-.306,.74],[.401,-.295,.867],[.412,-.295,.862],[.423,-.295,.857],
+  [.643,-.295,.707],[.665,-.284,.691],[.676,-.284,.68],[.401,-.273,.874],[.423,-.273,.864],
+  [.544,-.273,.793],[.632,-.273,.725],[.654,-.273,.706],[.687,-.273,.673],[.423,-.262,.867],
+  [.544,-.262,.797],[.555,-.262,.79],[.676,-.262,.689],[.709,-.262,.655],[.39,-.251,.886],
+  [.478,-.251,.842],[.5,-.251,.829],[.511,-.251,.822],[.522,-.251,.815],[.544,-.251,.801],
+  [.588,-.251,.769],[.698,-.251,.671],[.412,-.24,.879],[.478,-.24,.845],[.555,-.24,.796],
+  [.599,-.24,.764],[.379,-.229,.897],[.456,-.229,.86],[.478,-.229,.848],[.489,-.229,.842],
+  [.599,-.229,.767],[.61,-.229,.759],[.643,-.229,.731],[.357,-.218,.908],[.379,-.218,.899],
+  [.599,-.218,.771],[.61,-.218,.762],[.621,-.218,.753],[.368,-.207,.906],[.39,-.207,.897],
+  [.434,-.207,.877],[.456,-.207,.866],[.643,-.207,.737],[.654,-.207,.728],[.346,-.196,.918],
+  [.357,-.196,.913],[.423,-.196,.885],[.434,-.196,.879],[.456,-.196,.868],[.654,-.196,.731],
+  [.368,-.185,.911],[.423,-.185,.887],[.456,-.185,.871],[.643,-.185,.743],[.357,-.174,.918],
+  [.423,-.174,.889],[.434,-.174,.884],[.401,-.152,.903],[.434,-.152,.888],[.423,-.141,.895],
+];
+const ANGRY_MARK_CHARS = ["*", "X", "+", "#", "%"];
+const ANGRY_MARK_CENTER: [number, number, number] = [0.491, -0.332, 0.787];
 
 const BODY_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789@#%&*+-~";
 const FACE_CHARS = ["U", "W", "#", "@", "%"];
@@ -131,7 +228,7 @@ type Particle = {
 };
 
 function buildParticles(): Particle[] {
-  return GLOBE_DATA.map((d) => {
+  const particles: Particle[] = GLOBE_DATA.map((d) => {
     const tp = d[3];
     let ch: string;
     if (tp === 1) ch = FACE_CHARS[(Math.random() * FACE_CHARS.length) | 0];
@@ -152,6 +249,59 @@ function buildParticles(): Particle[] {
       pulseSpeed: Math.random() * 0.02 + 0.005,
     };
   });
+  // Angry face particles — separate from UwU, hidden by default (baseTp=3)
+  for (const d of ANGRY_FACE_DATA) {
+    particles.push({
+      bx: d[0], by: d[1], bz: d[2],
+      dx: 0, dy: 0, dz: 0,
+      vx: 0, vy: 0, vz: 0,
+      tp: 3, baseTp: 3,
+      ch: ANGRY_FACE_CHARS[(Math.random() * ANGRY_FACE_CHARS.length) | 0],
+      role: "hidden",
+      pulse: Math.random() * 6.28,
+      pulseSpeed: Math.random() * 0.02 + 0.005,
+    });
+  }
+  // Angry stress mark particles — hidden by default (baseTp=4)
+  for (const d of ANGRY_MARK_DATA) {
+    particles.push({
+      bx: d[0], by: d[1], bz: d[2],
+      dx: 0, dy: 0, dz: 0,
+      vx: 0, vy: 0, vz: 0,
+      tp: 4, baseTp: 4,
+      ch: ANGRY_MARK_CHARS[(Math.random() * ANGRY_MARK_CHARS.length) | 0],
+      role: "hidden",
+      pulse: Math.random() * 6.28,
+      pulseSpeed: Math.random() * 0.02 + 0.005,
+    });
+  }
+  // Dizzy face particles — hidden by default (baseTp=5)
+  for (const d of DIZZY_FACE_DATA) {
+    particles.push({
+      bx: d[0], by: d[1], bz: d[2],
+      dx: 0, dy: 0, dz: 0,
+      vx: 0, vy: 0, vz: 0,
+      tp: 5, baseTp: 5,
+      ch: DIZZY_FACE_CHARS[(Math.random() * DIZZY_FACE_CHARS.length) | 0],
+      role: "hidden",
+      pulse: Math.random() * 6.28,
+      pulseSpeed: Math.random() * 0.02 + 0.005,
+    });
+  }
+  // Dizzy cheek particles — hidden by default (baseTp=6)
+  for (const d of DIZZY_CHEEK_DATA) {
+    particles.push({
+      bx: d[0], by: d[1], bz: d[2],
+      dx: 0, dy: 0, dz: 0,
+      vx: 0, vy: 0, vz: 0,
+      tp: 6, baseTp: 6,
+      ch: CHEEK_CHARS[(Math.random() * CHEEK_CHARS.length) | 0],
+      role: "hidden",
+      pulse: Math.random() * 6.28,
+      pulseSpeed: Math.random() * 0.02 + 0.005,
+    });
+  }
+  return particles;
 }
 
 function buildStars(W: number, H: number, globeRadius: number): Star[] {
@@ -207,6 +357,7 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
 // Only operates on particles with bz > 0.6 (front hemisphere).
 
 function maskNormal(p: Particle): ParticleRole {
+  if (p.baseTp === 3 || p.baseTp === 4 || p.baseTp === 5 || p.baseTp === 6) return "hidden";
   if (p.baseTp === 2) return "cheek";
   if (p.baseTp === 1 && p.by < EYE_MOUTH_Y_SPLIT) return "eye";
   if (p.baseTp === 1) return "mouth";
@@ -214,40 +365,18 @@ function maskNormal(p: Particle): ParticleRole {
 }
 
 function maskDizzy(p: Particle): ParticleRole {
-  if (p.bz < 0.6) return "body";
-  // Cheeks — same regions as normal
-  if (p.baseTp === 2) return "cheek";
-  // @ eyes — annulus test at each eye center
-  const dlx = Math.sqrt((p.bx - LEFT_EYE_CX) ** 2 + (p.by - EYE_CY) ** 2);
-  const drx = Math.sqrt((p.bx - RIGHT_EYE_CX) ** 2 + (p.by - EYE_CY) ** 2);
-  if ((dlx > EYE_INNER_R && dlx < EYE_OUTER_R) ||
-      (drx > EYE_INNER_R && drx < EYE_OUTER_R)) return "eye";
-  // ~ mouth — sine wave band
-  const waveY = MOUTH_CY + WAVE_AMPLITUDE * Math.sin(p.bx * WAVE_FREQUENCY);
-  if (Math.abs(p.by - waveY) < WAVE_BAND && Math.abs(p.bx) < 0.35) return "mouth";
+  if (p.baseTp === 5) return "dizzyface";
+  if (p.baseTp === 6) return "dizzycheek";
+  // Hide UwU face, cheeks, angry particles
+  if (p.baseTp === 1 || p.baseTp === 2 || p.baseTp === 3 || p.baseTp === 4) return "hidden";
   return "body";
 }
 
 function maskDistressed(p: Particle): ParticleRole {
-  if (p.bz < 0.6) return "body";
-  // Cheeks — same regions as normal
-  if (p.baseTp === 2) return "cheek";
-  // > left eye — two diagonal lines meeting at tip (rightward-pointing chevron)
-  const ldx = p.bx - LEFT_EYE_CX;
-  const ldy = p.by - EYE_CY;
-  if (ldx < 0.01 && (
-    Math.abs(ldy - CHEVRON_SLOPE * ldx) < CHEVRON_LINE_W ||
-    Math.abs(ldy + CHEVRON_SLOPE * ldx) < CHEVRON_LINE_W
-  )) return "eye";
-  // < right eye — mirrored (leftward-pointing chevron)
-  const rdx = p.bx - RIGHT_EYE_CX;
-  const rdy = p.by - EYE_CY;
-  if (rdx > -0.01 && (
-    Math.abs(rdy - CHEVRON_SLOPE * (-rdx)) < CHEVRON_LINE_W ||
-    Math.abs(rdy + CHEVRON_SLOPE * (-rdx)) < CHEVRON_LINE_W
-  )) return "eye";
-  // _ mouth — horizontal flat line
-  if (Math.abs(p.by - MOUTH_CY) < FLAT_MOUTH_LW && Math.abs(p.bx) < FLAT_MOUTH_HW) return "mouth";
+  if (p.baseTp === 3) return "angryface";
+  if (p.baseTp === 4) return "stressmark";
+  // Hide UwU face, cheeks, and dizzy particles
+  if (p.baseTp === 1 || p.baseTp === 2 || p.baseTp === 5 || p.baseTp === 6) return "hidden";
   return "body";
 }
 
@@ -256,7 +385,28 @@ function applyMask(particles: Particle[], state: FaceState): void {
     : state === "distressed" ? maskDistressed
     : maskNormal;
   for (let i = 0; i < particles.length; i++) {
-    particles[i].role = fn(particles[i]);
+    const p = particles[i];
+    const prev = p.role;
+    p.role = fn(p);
+    // Swap character when a face particle becomes body (hide UwU remnants)
+    // or when a body particle becomes face (blend in)
+    if (p.role !== prev) {
+      if (p.role === "body") {
+        p.ch = BODY_CHARS[(Math.random() * BODY_CHARS.length) | 0];
+      } else if (p.role === "eye" || p.role === "mouth") {
+        p.ch = FACE_CHARS[(Math.random() * FACE_CHARS.length) | 0];
+      } else if (p.role === "cheek") {
+        p.ch = CHEEK_CHARS[(Math.random() * CHEEK_CHARS.length) | 0];
+      } else if (p.role === "angryface") {
+        p.ch = ANGRY_FACE_CHARS[(Math.random() * ANGRY_FACE_CHARS.length) | 0];
+      } else if (p.role === "stressmark") {
+        p.ch = ANGRY_MARK_CHARS[(Math.random() * ANGRY_MARK_CHARS.length) | 0];
+      } else if (p.role === "dizzyface") {
+        p.ch = DIZZY_FACE_CHARS[(Math.random() * DIZZY_FACE_CHARS.length) | 0];
+      } else if (p.role === "dizzycheek") {
+        p.ch = CHEEK_CHARS[(Math.random() * CHEEK_CHARS.length) | 0];
+      }
+    }
   }
 }
 
@@ -326,7 +476,13 @@ export default function UwuGlobe() {
     let cumulativeSpin = 0;
     let dragFrames = 0;
     let jerkAccum = 0;
+    let dirChanges = 0;
+    let prevDragDx = 0, prevDragDy = 0;
+    let shaking = false;      // true during shake animation
+    let shakeLocked = false;   // true from shake start until back to normal (blocks all input)
+    let shakeStart = 0;
     let cooldownTimer: number | null = null;
+    let cooldownTimer2: number | null = null;
     let wobbleStart = 0;
     let colorLerpStart = 0;
     let prevFaceState: FaceState = "normal";
@@ -339,19 +495,34 @@ export default function UwuGlobe() {
       applyMask(particles, next);
       if (next === "dizzy") {
         spinVelocity = 0;
-        // Snap face to front — nearest multiple of 2*PI
-        autoRotY = Math.round(autoRotY / (2 * Math.PI)) * 2 * Math.PI;
+        shakeLocked = true;
+        dragging = false;
+        const FRONT_FACING = Math.PI;
+        autoRotY = Math.round((autoRotY - FRONT_FACING) / (2 * Math.PI)) * 2 * Math.PI + FRONT_FACING;
         wobbleStart = performance.now();
         cooldownTimer = window.setTimeout(() => {
-          setFaceState("normal");
+          cooldownTimer2 = window.setTimeout(() => {
+            setFaceState("normal");
+            cooldownTimer2 = null;
+          }, 500);
+        }, 2000);
+      }
+      if (next === "distressed") {
+        // 3s max before forced shake-off (even if still dragging)
+        cooldownTimer = window.setTimeout(() => {
           cooldownTimer = null;
+          startShake();
         }, COOLDOWN_DURATION);
       }
       if (next === "normal") {
-        spinVelocity = DEF_VY;
+        shaking = false;
+        shakeLocked = false;
         cumulativeSpin = 0;
         dragFrames = 0;
         jerkAccum = 0;
+        dirChanges = 0;
+        prevDragDx = 0;
+        prevDragDy = 0;
       }
     };
 
@@ -399,7 +570,7 @@ export default function UwuGlobe() {
       const elapsed = (performance.now() - startTime) / 1000;
       const reduced = reducedMotion;
 
-      if (!dragging) {
+      if (!dragging && !shaking) {
         // Wait SPIN_DELAY seconds before starting auto-rotation
         if (elapsed > SPIN_DELAY) {
           autoRotY += spinVelocity;
@@ -409,29 +580,46 @@ export default function UwuGlobe() {
 
       // --- Face state triggers ---
       cumulativeSpin += Math.abs(spinVelocity);
-      cumulativeSpin *= SPIN_DECAY;
 
       if (dragging) {
         dragFrames++;
         jerkAccum += Math.abs(dragDx) + Math.abs(dragDy);
-        jerkAccum *= JERK_DECAY;
+        // Detect direction reversals (sign flip on either axis)
+        if ((prevDragDx * dragDx < 0) || (prevDragDy * dragDy < 0)) {
+          dirChanges++;
+          jerkAccum = 0; // reset on direction change
+        }
+        prevDragDx = dragDx;
+        prevDragDy = dragDy;
       }
 
-      // Distressed takes priority (active grab)
-      if (faceState === "normal" && dragging &&
-          (dragFrames > DRAG_DURATION_THRESHOLD || jerkAccum > JERK_THRESHOLD)) {
+      // Distressed requires shaking (direction changes) — smooth spinning won't trigger it
+      if (faceState === "normal" && dragging && dirChanges >= 2 &&
+          (dragFrames > DRAG_DURATION_THRESHOLD ||
+           dirChanges >= DIRECTION_CHANGE_THRESHOLD ||
+           jerkAccum > JERK_THRESHOLD)) {
         setFaceState("distressed");
       } else if (faceState === "normal" && !dragging &&
                  cumulativeSpin > DIZZY_THRESHOLD) {
         setFaceState("dizzy");
       }
 
-      // Wobble (dizzy only)
+      // Wobble (dizzy only — delayed start, sits still until wobbleStart)
       if (faceState === "dizzy") {
         const we = (performance.now() - wobbleStart) / 1000;
-        const decay = Math.exp(-we * WOBBLE_DAMPING);
-        rotX = DEF_RX + Math.sin(we * WOBBLE_FREQ_X) * WOBBLE_AMP_X * decay;
-        rotY = Math.cos(we * WOBBLE_FREQ_Y) * WOBBLE_AMP_Y * decay;
+        if (we > 0) {
+          const decay = Math.exp(-we * WOBBLE_DAMPING);
+          rotX = DEF_RX + Math.sin(we * WOBBLE_FREQ_X) * WOBBLE_AMP_X * decay;
+          rotY = Math.cos(we * WOBBLE_FREQ_Y) * WOBBLE_AMP_Y * decay;
+        }
+      }
+
+      // Shake-off (distressed → recovery)
+      if (shaking) {
+        const se = (performance.now() - shakeStart) / 1000;
+        const decay = Math.exp(-se * SHAKE_DAMPING);
+        rotY = Math.sin(se * SHAKE_FREQ) * SHAKE_AMP * decay;
+        rotX += (DEF_RX - rotX) * 0.035;
       }
 
       ctx.clearRect(0, 0, W, H);
@@ -552,7 +740,33 @@ export default function UwuGlobe() {
 
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
+        if (p.role === "hidden") continue; // skip physics for hidden particles
         p.pulse += p.pulseSpeed;
+
+        // Stress mark breathing animation — pulse in/out from center
+        if (p.role === "stressmark") {
+          const s = 0.15 * Math.sin(t * 3.0);
+          const dx = p.bx - ANGRY_MARK_CENTER[0];
+          const dy = p.by - ANGRY_MARK_CENTER[1];
+          const dz = p.bz - ANGRY_MARK_CENTER[2];
+          p.dx = dx * s;
+          p.dy = dy * s;
+          p.dz = dz * s;
+        }
+
+        // Dizzy eye spin — orbit face particles around eye centers
+        let pbx = p.bx, pby = p.by, pbz = p.bz;
+        if (p.role === "dizzyface") {
+          const cx = p.bx < 0 ? LEYE_CX : REYE_CX;
+          const cy = p.bx < 0 ? LEYE_CY : REYE_CY;
+          const edx = p.bx - cx, edy = p.by - cy;
+          const a = t * EYE_SPIN_SPEED;
+          const ca = Math.cos(a), sa = Math.sin(a);
+          const rx2 = cx + edx * ca - edy * sa;
+          const ry2 = cy + edx * sa + edy * ca;
+          const r2 = rx2 * rx2 + ry2 * ry2;
+          if (r2 < 0.99) { pbx = rx2; pby = ry2; pbz = Math.sqrt(1 - r2); }
+        }
 
         p.vx += Math.sin(t * 0.7 + p.bx * 5) * DRIFT_AMOUNT;
         p.vy += Math.cos(t * 0.9 + p.by * 5) * DRIFT_AMOUNT;
@@ -571,7 +785,7 @@ export default function UwuGlobe() {
           p.dx *= s; p.dy *= s; p.dz *= s;
         }
 
-        const [rx, ry, rz] = rotate3D(p.bx + p.dx, p.by + p.dy, p.bz + p.dz);
+        const [rx, ry, rz] = rotate3D(pbx + p.dx, pby + p.dy, pbz + p.dz);
         const [sx, sy, sz, sc] = project(rx, ry, rz);
 
         // 3D sphere-mapped repulsion — front-facing only
@@ -608,6 +822,7 @@ export default function UwuGlobe() {
 
       for (const pr of projected) {
         const p = particles[pr.i];
+        if (p.role === "hidden") continue;
         const facing = Math.max(0, (-pr.sz + 0.4) * 2.5);
         if (facing < 0.02) continue;
 
@@ -615,13 +830,11 @@ export default function UwuGlobe() {
         const fs = Math.max(7, Math.min(18, pr.sc * 0.09));
 
         if (p.role === "eye") {
-          const eyeColor = faceState === "dizzy" ? EYE_COLOR_WHITE : FACE_COLOR;
-          const eyeGlow = faceState === "dizzy" ? EYE_COLOR_WHITE : FACE_GLOW;
           const al = Math.min(facing, 1) * (glow + 0.7);
           ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${eyeGlow[0]},${eyeGlow[1]},${eyeGlow[2]},${(al * 0.25).toFixed(2)})`;
+          ctx.fillStyle = `rgba(${FACE_GLOW[0]},${FACE_GLOW[1]},${FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
-          ctx.fillStyle = `rgba(${eyeColor[0]},${eyeColor[1]},${eyeColor[2]},${al.toFixed(2)})`;
+          ctx.fillStyle = `rgba(${FACE_COLOR[0]},${FACE_COLOR[1]},${FACE_COLOR[2]},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
         } else if (p.role === "mouth") {
           const al = Math.min(facing, 1) * (glow + 0.7);
@@ -634,6 +847,36 @@ export default function UwuGlobe() {
           const al = Math.min(facing, 1) * (glow + 0.6);
           ctx.font = `bold ${(fs * 1.2).toFixed(1)}px ${FONT}`;
           ctx.fillStyle = `rgba(${CHEEK_COLOR[0]},${CHEEK_COLOR[1]},${CHEEK_COLOR[2]},${al.toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+        } else if (p.role === "angryface") {
+          // Angry face features — red with glow
+          const al = Math.min(facing, 1) * (glow + 0.7);
+          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${ANGRY_FACE_GLOW[0]},${ANGRY_FACE_GLOW[1]},${ANGRY_FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+          ctx.fillStyle = `rgba(${ANGRY_FACE_COLOR[0]},${ANGRY_FACE_COLOR[1]},${ANGRY_FACE_COLOR[2]},${al.toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+        } else if (p.role === "stressmark") {
+          // Stress mark — pulsing red
+          const pulse = 0.85 + 0.15 * Math.sin(t * 3.5);
+          const al = Math.min(facing, 1) * (glow + 0.7) * pulse;
+          const mfs = fs * 1.2 * (0.9 + 0.2 * Math.sin(t * 3.5));
+          ctx.font = `bold ${mfs.toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${ANGRY_MARK_GLOW[0]},${ANGRY_MARK_GLOW[1]},${ANGRY_MARK_GLOW[2]},${(al * 0.3).toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+          ctx.fillStyle = `rgba(${ANGRY_MARK_COLOR[0]},${ANGRY_MARK_COLOR[1]},${ANGRY_MARK_COLOR[2]},${al.toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+        } else if (p.role === "dizzyface") {
+          const al = Math.min(facing, 1) * (glow + 0.7);
+          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${DIZZY_FACE_GLOW[0]},${DIZZY_FACE_GLOW[1]},${DIZZY_FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+          ctx.fillStyle = `rgba(${DIZZY_FACE_COLOR[0]},${DIZZY_FACE_COLOR[1]},${DIZZY_FACE_COLOR[2]},${al.toFixed(2)})`;
+          ctx.fillText(p.ch, pr.sx, pr.sy);
+        } else if (p.role === "dizzycheek") {
+          const al = Math.min(facing, 1) * (glow + 0.6);
+          ctx.font = `bold ${(fs * 1.2).toFixed(1)}px ${FONT}`;
+          ctx.fillStyle = `rgba(${DIZZY_CHEEK_COLOR[0]},${DIZZY_CHEEK_COLOR[1]},${DIZZY_CHEEK_COLOR[2]},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
         } else {
           // Body — color depends on face state
@@ -664,39 +907,14 @@ export default function UwuGlobe() {
         }
       }
 
-      // Stress mark particles (distressed only) — rendered after globe particles so they appear on top
-      if (faceState === "distressed") {
-        const stressPulse = 0.8 + Math.sin(t * 8) * 0.2;
-        for (let si = 0; si < STRESS_POSITIONS.length; si++) {
-          const sp = STRESS_POSITIONS[si];
-          const [srx, sry, srz] = rotate3D(sp[0], sp[1], sp[2]);
-          const [ssx, ssy, ssz, ssc] = project(srx, sry, srz);
-          // Only render if front-facing
-          if (srz < 0.4) {
-            const sFacing = Math.max(0, (-ssz + 0.4) * 2.5);
-            if (sFacing > 0.02) {
-              const sfs = Math.max(7, Math.min(18, ssc * 0.09)) * 1.2;
-              const sal = Math.min(sFacing, 1) * stressPulse;
-              const sCh = STRESS_CHARS[(Math.random() * STRESS_CHARS.length) | 0];
-              // Glow layer
-              ctx.font = `bold ${(sfs * 1.4).toFixed(1)}px ${FONT}`;
-              ctx.fillStyle = `rgba(${STRESS_COLOR[0]},${STRESS_COLOR[1]},${STRESS_COLOR[2]},${(sal * 0.3).toFixed(2)})`;
-              ctx.fillText(sCh, ssx, ssy);
-              // Sharp layer
-              ctx.font = `bold ${sfs.toFixed(1)}px ${FONT}`;
-              ctx.fillStyle = `rgba(${STRESS_COLOR[0]},${STRESS_COLOR[1]},${STRESS_COLOR[2]},${sal.toFixed(2)})`;
-              ctx.fillText(sCh, ssx, ssy);
-            }
-          }
-        }
-      }
-
       rafRef.current = requestAnimationFrame(frame);
     };
 
     // Input handlers
     const onMouseDown = (e: MouseEvent) => {
+      if (shakeLocked) return;
       dragging = true;
+      cumulativeSpin = 0;
       lastX = e.clientX;
       lastY = e.clientY;
     };
@@ -709,32 +927,59 @@ export default function UwuGlobe() {
 
       if (!dragging) return;
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
-      rotY += dx * 0.005;
-      rotX += dy * 0.005;
+      rotY += dx * 0.01;
+      rotX += dy * 0.01;
       rotX = Math.max(-1.2, Math.min(1.2, rotX));
       lastX = e.clientX;
       lastY = e.clientY;
-      spinVelocity = dx * 0.0004;
+      spinVelocity = dx * 0.0008;
       dragDx = dx;
       dragDy = dy;
     };
 
+    const startShake = () => {
+      shaking = true;
+      shakeLocked = true;
+      dragging = false;
+      spinVelocity = 0;
+      // Snap face to front
+      const FRONT_FACING = Math.PI;
+      autoRotY = Math.round((autoRotY - FRONT_FACING) / (2 * Math.PI)) * 2 * Math.PI + FRONT_FACING;
+      rotY = 0;
+      shakeStart = performance.now();
+      cooldownTimer = window.setTimeout(() => {
+        shaking = false;
+        cooldownTimer2 = window.setTimeout(() => {
+          setFaceState("normal");
+          cooldownTimer2 = null;
+        }, 500);
+      }, SHAKE_DURATION);
+    };
+
     const onMouseUp = () => {
       dragging = false;
-      if (faceState === "distressed" && cooldownTimer === null) {
+      if (faceState === "distressed" && !shaking) {
+        // User let go — cancel the 3s forced timer, shake in 0.5s
+        if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
         cooldownTimer = window.setTimeout(() => {
-          setFaceState("normal");
           cooldownTimer = null;
-        }, COOLDOWN_DURATION);
+          startShake();
+        }, 500);
       }
       dragFrames = 0;
+      dirChanges = 0;
+      jerkAccum = 0;
+      prevDragDx = 0;
+      prevDragDy = 0;
     };
     const onMouseLeave = () => { mouseActive = false; };
 
     // Touch support
     const onTouchStart = (e: TouchEvent) => {
+      if (shakeLocked) return;
       if (e.touches.length === 1) {
         dragging = true;
+        cumulativeSpin = 0;
         lastX = e.touches[0].clientX;
         lastY = e.touches[0].clientY;
         const r = container.getBoundingClientRect();
@@ -753,12 +998,12 @@ export default function UwuGlobe() {
       if (dragging) {
         const dx = e.touches[0].clientX - lastX;
         const dy = e.touches[0].clientY - lastY;
-        rotY += dx * 0.005;
-        rotX += dy * 0.005;
+        rotY += dx * 0.01;
+        rotX += dy * 0.01;
         rotX = Math.max(-1.2, Math.min(1.2, rotX));
         lastX = e.touches[0].clientX;
         lastY = e.touches[0].clientY;
-        spinVelocity = dx * 0.0004;
+        spinVelocity = dx * 0.0008;
         dragDx = dx;
         dragDy = dy;
       }
@@ -768,13 +1013,18 @@ export default function UwuGlobe() {
     const onTouchEnd = () => {
       dragging = false;
       mouseActive = false;
-      if (faceState === "distressed" && cooldownTimer === null) {
+      if (faceState === "distressed" && !shaking) {
+        if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
         cooldownTimer = window.setTimeout(() => {
-          setFaceState("normal");
           cooldownTimer = null;
-        }, COOLDOWN_DURATION);
+          startShake();
+        }, 500);
       }
       dragFrames = 0;
+      dirChanges = 0;
+      jerkAccum = 0;
+      prevDragDx = 0;
+      prevDragDy = 0;
     };
 
     resize();
@@ -791,6 +1041,7 @@ export default function UwuGlobe() {
 
     return () => {
       if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
+      if (cooldownTimer2 !== null) window.clearTimeout(cooldownTimer2);
       cancelAnimationFrame(rafRef.current);
       motionMql.removeEventListener("change", onMotionChange);
       window.removeEventListener("resize", resize);
