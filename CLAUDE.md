@@ -49,6 +49,7 @@ Do **not** yet:
 - **component** — scaffold a page/layout/component (`.claude/skills/component/`)
 - **figma-to-jsx** — Figma node → React component, needs Figma MCP (`.claude/skills/figma-to-jsx/`)
 - **dep-vet** — vet any npm package before install; required by the Security policy above (`.claude/skills/dep-vet/`)
+- **cross-browser-audit** — audit frontend code for cross-browser issues across Chrome, Edge, Firefox, Safari (`.claude/skills/cross-browser-audit/`)
 
 ## Related
 

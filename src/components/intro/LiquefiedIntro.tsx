@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { startDecryptSound, startGlitchSound } from "@/lib/sfx";
 
 type LiquefiedIntroProps = {
   onFinish: () => void;
@@ -84,8 +83,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   const [glitch, setGlitch] = useState<GlitchFrame | null>(null);
   const [fadeOut, setFadeOut] = useState(false);
   const finished = useRef(false);
-  const decryptStopRef = useRef<(() => void) | null>(null);
-  const glitchStopRef = useRef<(() => void) | null>(null);
 
   // Scramble all rows during load — density ramps up over time
   useEffect(() => {
@@ -123,7 +120,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   useEffect(() => {
     if (phase !== "load") return;
     mountedRef.current = true;
-    decryptStopRef.current = startDecryptSound();
     const id = window.setTimeout(() => setPhase("reveal"), 700);
     return () => window.clearTimeout(id);
   }, [phase]);
@@ -227,8 +223,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   // Hold briefly, then glitch — stop decrypt sound
   useEffect(() => {
     if (phase !== "hold") return;
-    decryptStopRef.current?.();
-    decryptStopRef.current = null;
     const id = window.setTimeout(() => setPhase("glitch"), 0);
     return () => window.clearTimeout(id);
   }, [phase]);
@@ -236,7 +230,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   // Glitch phase — UWU jitters with RGB split, then fade
   useEffect(() => {
     if (phase !== "glitch") return;
-    glitchStopRef.current = startGlitchSound();
     const start = performance.now();
     const glitchDuration = 600;
 
@@ -259,8 +252,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   // Fade phase — smooth opacity transition out
   useEffect(() => {
     if (phase !== "fade") return;
-    glitchStopRef.current?.();
-    glitchStopRef.current = null;
     // Trigger CSS fade
     requestAnimationFrame(() => setFadeOut(true));
     const id = window.setTimeout(() => {
@@ -275,8 +266,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   const skip = () => {
     if (finished.current) return;
     finished.current = true;
-    decryptStopRef.current?.();
-    glitchStopRef.current?.();
     setPhase("done");
     onFinish();
   };

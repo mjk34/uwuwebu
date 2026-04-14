@@ -29,12 +29,24 @@ export default function BgMusic() {
     };
     audio.addEventListener("ended", onEnded);
 
-    const startId = window.setTimeout(() => {
-      audio.play().catch(() => {});
-    }, 500);
+    // Defer playback until after a user gesture (autoplay policy).
+    // Safari may reject play() if the audio hasn't buffered yet,
+    // so retry on subsequent gestures until it actually starts.
+    let playing = false;
+    const tryPlay = () => {
+      if (playing) return;
+      audio.play().then(() => {
+        playing = true;
+        document.removeEventListener("pointerdown", tryPlay);
+        document.removeEventListener("keydown", tryPlay);
+      }, () => {});
+    };
+    document.addEventListener("pointerdown", tryPlay);
+    document.addEventListener("keydown", tryPlay);
 
     return () => {
-      window.clearTimeout(startId);
+      document.removeEventListener("pointerdown", tryPlay);
+      document.removeEventListener("keydown", tryPlay);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       audio.removeEventListener("ended", onEnded);
       audio.pause();

@@ -112,11 +112,13 @@ export default function HeroSection() {
     if (hovered) return;
     if (menuStore.getOpen()) return;
     stopGlitch();
+    setDisplay(scrambleStep(HOVER_TEXT, 0));
     setHovered(true);
     runScramble(HOVER_TEXT);
   };
 
   const handleLeave = () => {
+    setDisplay(scrambleStep(DEFAULT_TEXT, 0));
     setHovered(false);
     runScramble(DEFAULT_TEXT);
   };

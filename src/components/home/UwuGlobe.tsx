@@ -7,7 +7,7 @@ const BODY_COLOR: [number, number, number] = [250, 220, 120];
 const FACE_COLOR: [number, number, number] = [20, 255, 200];
 const FACE_GLOW: [number, number, number] = [20, 255, 180];
 const CHEEK_COLOR: [number, number, number] = [255, 120, 180];
-const FONT = "var(--font-geist-mono), 'SF Mono', 'Fira Code', 'Courier New', monospace";
+const FONT_FALLBACKS = "'SF Mono', 'Fira Code', 'Courier New', monospace";
 
 const DEF_RX = -0.1;
 const DEF_VY = 0.00096;
@@ -100,8 +100,8 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
 
   // Scale star font size based on viewport — smaller on mobile
   const viewMin = Math.min(W, H);
-  const fontBase = viewMin < 500 ? 40 : 80;
-  const fontRange = viewMin < 500 ? 20 : 40;
+  const fontBase = viewMin < 500 ? 10 : 20;
+  const fontRange = viewMin < 500 ? 5 : 10;
 
   for (let i = 0; i < STAR_COUNT; i++) {
     let x: number, y: number;
@@ -154,6 +154,20 @@ export default function UwuGlobe() {
     const particles = buildParticles();
     const startTime = performance.now();
 
+    // Resolve CSS variable for canvas — canvas ctx.font can't read var()
+    const geistMono = getComputedStyle(document.documentElement)
+      .getPropertyValue("--font-geist-mono")
+      .trim();
+    const FONT = geistMono
+      ? `${geistMono}, ${FONT_FALLBACKS}`
+      : FONT_FALLBACKS;
+
+    // Cache reduced-motion preference once; update on change
+    const motionMql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reducedMotion = motionMql.matches;
+    const onMotionChange = (e: MediaQueryListEvent) => { reducedMotion = e.matches; };
+    motionMql.addEventListener("change", onMotionChange);
+
     let W = 0, H = 0;
     let rotY = 0, rotX = DEF_RX, autoRotY = Math.PI - (20 * Math.PI / 180);
     let dragging = false, lastX = 0, lastY = 0;
@@ -204,7 +218,7 @@ export default function UwuGlobe() {
     const frame = () => {
       const t = performance.now() / 1000;
       const elapsed = (performance.now() - startTime) / 1000;
-      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const reduced = reducedMotion;
 
       if (!dragging) {
         // Wait SPIN_DELAY seconds before starting auto-rotation
@@ -473,7 +487,7 @@ export default function UwuGlobe() {
         dragDx = dx;
         dragDy = dy;
       }
-      e.preventDefault();
+      if (dragging) e.preventDefault();
     };
 
     const onTouchEnd = () => { dragging = false; mouseActive = false; };
@@ -492,6 +506,7 @@ export default function UwuGlobe() {
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      motionMql.removeEventListener("change", onMotionChange);
       window.removeEventListener("resize", resize);
       container.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
