@@ -39,6 +39,8 @@ const GLOBE_SCALE = 1;         // globe render scale
 const SPIN_DELAY = 1;         // seconds before auto-rotation starts
 // --- Face state triggers ---
 const DIZZY_THRESHOLD = 3 * 2 * Math.PI; // 3 full rotations
+const SPIN_DECAY = 0.995;               // cumulative spin bleed-off per frame
+const DIZZY_SPEED_THRESHOLD = 0.012;    // min |spinVelocity| to count toward dizzy
 const DRAG_DURATION_THRESHOLD = 480; // frames (~8s at 60fps)
 const JERK_THRESHOLD = 800;       // px/s sustained movement
 const DIRECTION_CHANGE_THRESHOLD = 5; // direction reversals while dragging
@@ -470,6 +472,10 @@ export default function UwuGlobe() {
     let mouseX = -9000, mouseY = -9000, mouseActive = false;
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
     let dragDx = 0, dragDy = 0;
+    let dragStartTime = 0;
+    let dragTotalDx = 0;
+    const FLICK_WINDOW = 500; // ms — quick grab threshold
+    const FLICK_MULTIPLIER = 0.003; // velocity boost for flicks
 
     // --- Face state ---
     let faceState: FaceState = "normal";
@@ -483,6 +489,8 @@ export default function UwuGlobe() {
     let shakeStart = 0;
     let cooldownTimer: number | null = null;
     let cooldownTimer2: number | null = null;
+    let lastRecovery = 0;        // timestamp of last return to normal
+    const RECOVERY_COOLDOWN = 3000; // ms before triggers can fire again
     let wobbleStart = 0;
     let colorLerpStart = 0;
     let prevFaceState: FaceState = "normal";
@@ -517,6 +525,7 @@ export default function UwuGlobe() {
       if (next === "normal") {
         shaking = false;
         shakeLocked = false;
+        lastRecovery = performance.now();
         cumulativeSpin = 0;
         dragFrames = 0;
         jerkAccum = 0;
@@ -579,7 +588,10 @@ export default function UwuGlobe() {
       }
 
       // --- Face state triggers ---
-      cumulativeSpin += Math.abs(spinVelocity);
+      if (Math.abs(spinVelocity) > DIZZY_SPEED_THRESHOLD) {
+        cumulativeSpin += Math.abs(spinVelocity);
+      }
+      cumulativeSpin *= SPIN_DECAY;
 
       if (dragging) {
         dragFrames++;
@@ -594,12 +606,13 @@ export default function UwuGlobe() {
       }
 
       // Distressed requires shaking (direction changes) — smooth spinning won't trigger it
-      if (faceState === "normal" && dragging && dirChanges >= 2 &&
+      const canTrigger = faceState === "normal" && performance.now() - lastRecovery > RECOVERY_COOLDOWN;
+      if (canTrigger && dragging && dirChanges >= 2 &&
           (dragFrames > DRAG_DURATION_THRESHOLD ||
            dirChanges >= DIRECTION_CHANGE_THRESHOLD ||
            jerkAccum > JERK_THRESHOLD)) {
         setFaceState("distressed");
-      } else if (faceState === "normal" && !dragging &&
+      } else if (canTrigger && !dragging &&
                  cumulativeSpin > DIZZY_THRESHOLD) {
         setFaceState("dizzy");
       }
@@ -914,7 +927,8 @@ export default function UwuGlobe() {
     const onMouseDown = (e: MouseEvent) => {
       if (shakeLocked) return;
       dragging = true;
-      cumulativeSpin = 0;
+      dragStartTime = performance.now();
+      dragTotalDx = 0;
       lastX = e.clientX;
       lastY = e.clientY;
     };
@@ -932,6 +946,7 @@ export default function UwuGlobe() {
       rotX = Math.max(-1.2, Math.min(1.2, rotX));
       lastX = e.clientX;
       lastY = e.clientY;
+      dragTotalDx += dx;
       spinVelocity = dx * 0.0008;
       dragDx = dx;
       dragDy = dy;
@@ -957,6 +972,9 @@ export default function UwuGlobe() {
     };
 
     const onMouseUp = () => {
+      if (dragging && performance.now() - dragStartTime < FLICK_WINDOW) {
+        spinVelocity = dragTotalDx * FLICK_MULTIPLIER;
+      }
       dragging = false;
       if (faceState === "distressed" && !shaking) {
         // User let go — cancel the 3s forced timer, shake in 0.5s
@@ -979,7 +997,8 @@ export default function UwuGlobe() {
       if (shakeLocked) return;
       if (e.touches.length === 1) {
         dragging = true;
-        cumulativeSpin = 0;
+        dragStartTime = performance.now();
+        dragTotalDx = 0;
         lastX = e.touches[0].clientX;
         lastY = e.touches[0].clientY;
         const r = container.getBoundingClientRect();
@@ -1003,6 +1022,7 @@ export default function UwuGlobe() {
         rotX = Math.max(-1.2, Math.min(1.2, rotX));
         lastX = e.touches[0].clientX;
         lastY = e.touches[0].clientY;
+        dragTotalDx += dx;
         spinVelocity = dx * 0.0008;
         dragDx = dx;
         dragDy = dy;
@@ -1011,6 +1031,9 @@ export default function UwuGlobe() {
     };
 
     const onTouchEnd = () => {
+      if (dragging && performance.now() - dragStartTime < FLICK_WINDOW) {
+        spinVelocity = dragTotalDx * FLICK_MULTIPLIER;
+      }
       dragging = false;
       mouseActive = false;
       if (faceState === "distressed" && !shaking) {
