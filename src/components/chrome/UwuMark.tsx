@@ -7,14 +7,13 @@ export default function UwuMark({ className, title = "UwUversity" }: UwuMarkProp
   return (
     <span
       aria-label={title}
-      className={className}
-      style={{ display: "inline-flex", alignItems: "center", lineHeight: 1 }}
+      className={`inline-flex items-center leading-none ${className ?? ""}`}
     >
       <svg
         viewBox="0 0 480 160"
         role="img"
         aria-hidden="true"
-        style={{ height: "1em", width: "auto", display: "block" }}
+        className="h-[1em] w-auto block"
       >
         <text
           x="240"

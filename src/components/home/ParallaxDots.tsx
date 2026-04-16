@@ -44,7 +44,11 @@ export default function ParallaxDots() {
     if (!ctx) return;
     const s = stateRef.current;
 
-    s.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    s.reduced = mql.matches;
+    const onMotionChange = () => { s.reduced = mql.matches; };
+    mql.addEventListener("change", onMotionChange);
+
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -70,6 +74,7 @@ export default function ParallaxDots() {
     }
 
     const t0 = performance.now();
+    let positions = new Float32Array(s.dots.length * 3);
 
     const draw = () => {
       const now = performance.now();
@@ -89,7 +94,7 @@ export default function ParallaxDots() {
 
       const { dots } = s;
       const len = dots.length;
-      const positions = new Float32Array(len * 3); // fx, fy, brighten
+      if (positions.length < len * 3) positions = new Float32Array(len * 3);
 
       for (let i = 0; i < len; i++) {
         const d = dots[i];
@@ -158,6 +163,7 @@ export default function ParallaxDots() {
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
+      mql.removeEventListener("change", onMotionChange);
     };
   }, [buildDots]);
 

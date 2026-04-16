@@ -1,3 +1,5 @@
+"use client";
+
 export type SfxName =
   | "hover"
   | "click"
@@ -9,6 +11,7 @@ export type SfxName =
   | "tick-buzz"
   | "cursor-blink";
 
+// Client-side singletons — one AudioContext shared across all sfx callers
 let ctx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
 let muted = false;
@@ -38,8 +41,8 @@ function getCtx(): AudioContext | null {
   return ctx;
 }
 
-function masterOut(): AudioNode {
-  return masterGain || getCtx()!.destination;
+function masterOut(ac: AudioContext): AudioNode {
+  return masterGain || ac.destination;
 }
 
 function tone(
@@ -59,7 +62,7 @@ function tone(
   g.gain.setValueAtTime(0, now);
   g.gain.linearRampToValueAtTime(gain, now + 0.004);
   g.gain.exponentialRampToValueAtTime(0.0001, now + durMs / 1000);
-  osc.connect(g).connect(masterOut());
+  osc.connect(g).connect(masterOut(ac));
   osc.start(now);
   osc.stop(now + durMs / 1000 + 0.02);
 }
@@ -81,7 +84,7 @@ function noiseBurst(durMs: number, gain: number, highpass = 1800): void {
   const g = ac.createGain();
   g.gain.setValueAtTime(gain, now);
   g.gain.exponentialRampToValueAtTime(0.0001, now + durMs / 1000);
-  src.connect(hp).connect(g).connect(masterOut());
+  src.connect(hp).connect(g).connect(masterOut(ac));
   src.start(now);
   src.stop(now + durMs / 1000 + 0.02);
 }
@@ -112,37 +115,36 @@ export function playSfx(name: SfxName): void {
       window.setTimeout(() => tone(330, 140, "sawtooth", 0.05), 60);
       return;
     case "tick-metallic": {
-      // Morse code — dit-dah pattern, 800Hz CW tone
       tone(800, 40, "sine", 0.09);
       window.setTimeout(() => tone(800, 100, "sine", 0.09), 60);
       return;
     }
     case "tick-data": {
-      // Radar sweep ping — sine that drops with long tail
-      const ac2 = getCtx()!;
-      const now2 = ac2.currentTime;
-      const osc2 = ac2.createOscillator();
-      const g2 = ac2.createGain();
+      const now2 = ac.currentTime;
+      const osc2 = ac.createOscillator();
+      const g2 = ac.createGain();
       osc2.type = "sine";
       osc2.frequency.setValueAtTime(3000, now2);
       osc2.frequency.exponentialRampToValueAtTime(600, now2 + 0.25);
       g2.gain.setValueAtTime(0.1, now2);
       g2.gain.exponentialRampToValueAtTime(0.0001, now2 + 0.3);
-      osc2.connect(g2).connect(masterOut());
+      osc2.connect(g2).connect(masterOut(ac));
       osc2.start(now2);
       osc2.stop(now2 + 0.35);
       return;
     }
     case "tick-buzz":
-      // Hacker terminal — fast noisy keypress + CRT blip
       noiseBurst(10, 0.08, 4000);
       tone(3200, 8, "square", 0.04);
       window.setTimeout(() => noiseBurst(6, 0.04, 5000), 15);
       return;
     case "cursor-blink":
-      // Soft sonar ping — gentle sine blip
       tone(600, 80, "sine", 0.04);
       return;
+    default: {
+      const _exhaustive: never = name;
+      return _exhaustive;
+    }
   }
 }
 
@@ -154,9 +156,4 @@ export function syncMuteState(isMuted: boolean): void {
     if (muted) void ctx.suspend();
     else void ctx.resume();
   }
-}
-
-
-export function preloadSfx(): void {
-  getCtx();
 }

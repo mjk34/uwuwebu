@@ -310,8 +310,15 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   return (
     <div
       role="presentation"
+      tabIndex={0}
       onClick={skip}
-      className={`fixed inset-0 z-[100] flex cursor-pointer items-center justify-center overflow-hidden bg-black transition-opacity duration-500 ease-out ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          skip();
+        }
+      }}
+      className={`fixed inset-0 z-[100] flex cursor-pointer items-center justify-center overflow-hidden bg-black transition-opacity duration-500 ease-out outline-none ${
         fadeOut ? "opacity-0" : "opacity-100"
       }`}
     >
@@ -374,7 +381,14 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
           isGlitch ? "opacity-0" : "opacity-100"
         }`}
       >
-        <div className="h-px w-full bg-accent/20">
+        <div
+          className="h-px w-full bg-accent/20"
+          role="progressbar"
+          aria-valuenow={loadPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Loading"
+        >
           <div
             className="h-full bg-accent/60 transition-all duration-150 ease-out"
             style={{ width: `${loadPct}%` }}

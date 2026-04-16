@@ -7,20 +7,8 @@ export default function HomePage() {
   return (
     <main className="relative flex h-screen w-full flex-col overflow-hidden">
       <ParallaxDots />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background: "radial-gradient(ellipse 55% 50% at 50% 50%, rgba(25,30,50,0.5) 0%, transparent 65%)",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background: "radial-gradient(ellipse 70% 65% at 50% 50%, transparent 60%, rgba(13,14,20,0.45) 100%)",
-        }}
-      />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-radial-glow" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-radial-accent" />
       <BgMusic />
       <HeroSection />
       <UwuGlobe />

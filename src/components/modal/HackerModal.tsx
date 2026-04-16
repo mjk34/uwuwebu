@@ -26,7 +26,7 @@ let hasPlayedBoot = false;
 export default function HackerModal({ onClose }: HackerModalProps) {
   const [bootDone, setBootDone] = useState(hasPlayedBoot);
   const ctaRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Mark as seen once boot animation finishes (not on mount)
   // so strict-mode double-mount doesn't skip the animation
@@ -34,42 +34,23 @@ export default function HackerModal({ onClose }: HackerModalProps) {
     if (bootDone) hasPlayedBoot = true;
   }, [bootDone]);
 
+  // Open as modal — browser handles focus trapping, inert, and Escape
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key === "Tab") {
-        const root = dialogRef.current;
-        if (!root) return;
-        const focusables = root.querySelectorAll<HTMLElement>(
-          'a, button, [tabindex="0"]',
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+
+    const onCancel = (e: Event) => {
+      e.preventDefault();
+      onClose();
     };
-    window.addEventListener("keydown", onKey);
-    const prev = document.activeElement as HTMLElement | null;
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      prev?.focus?.();
-    };
+    dialog.addEventListener("cancel", onCancel);
+    return () => dialog.removeEventListener("cancel", onCancel);
   }, [onClose]);
 
   useEffect(() => {
     if (!bootDone) return;
     const t = window.setTimeout(() => ctaRef.current?.focus(), 50);
-    // Play sound in sync with cursor blink (1s interval, sound on appear)
     const blinkId = window.setInterval(() => {
       playSfx("cursor-blink");
     }, 1000);
@@ -90,26 +71,22 @@ export default function HackerModal({ onClose }: HackerModalProps) {
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-label="Discord authentication terminal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg-deep/85 backdrop-blur-sm"
+      className="fixed inset-0 z-50 m-0 h-screen w-screen max-h-none max-w-none border-none bg-transparent p-0"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === dialogRef.current) onClose();
       }}
     >
-      <div
-        ref={dialogRef}
-        className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(0,240,255,0.4)]"
-      >
+      <div className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(0,240,255,0.4)]">
         <div className="flex items-center justify-between border-b border-fg-dim/30 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-fg-dim">
           <span>{"// tty/uwuversity/auth"}</span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close terminal"
-            className="text-fg-muted transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
+            className="flex min-h-11 min-w-11 items-center justify-center text-fg-muted transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
           >
             [X]
           </button>
@@ -139,6 +116,6 @@ export default function HackerModal({ onClose }: HackerModalProps) {
           {bootDone ? "press ENTER to execute" : "awaiting handshake"}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

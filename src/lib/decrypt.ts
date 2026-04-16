@@ -13,7 +13,3 @@ export function scrambleStep(target: string, revealedCount: number): string {
   }
   return out;
 }
-
-export function scrambleTicks(target: string, totalTicks: number): number {
-  return Math.max(1, Math.ceil(target.length / Math.max(1, totalTicks / target.length)));
-}

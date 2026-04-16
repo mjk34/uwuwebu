@@ -10,6 +10,8 @@ export default function MuteToggle() {
 
   useEffect(() => {
     const stored = isMuted();
+    // Hydrate client state from localStorage — intentional SSR pattern
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal(stored);
     syncMuteState(stored);
   }, []);
@@ -28,7 +30,7 @@ export default function MuteToggle() {
       aria-pressed={!muted}
       aria-label={muted ? "Unmute sound effects" : "Mute sound effects"}
       onClick={toggle}
-      className={`flex h-8 w-8 items-center justify-center rounded border bg-bg-deep/70 transition-all focus-visible:outline-none focus-visible:ring-2 ${
+      className={`flex h-11 w-11 items-center justify-center rounded border bg-bg-deep/70 transition-all focus-visible:outline-none focus-visible:ring-2 ${
         muted
           ? "border-danger/50 text-danger hover:border-danger hover:shadow-[0_0_12px_rgba(255,42,109,0.35)]"
           : "border-accent/40 text-accent hover:border-accent/70 hover:shadow-[0_0_12px_rgba(0,240,255,0.3)]"

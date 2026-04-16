@@ -77,6 +77,7 @@ export default function SideMenu() {
         id="uwuversity-side-menu"
         ref={panelRef}
         aria-hidden={!open}
+        inert={!open || undefined}
         aria-label="Primary navigation"
         className={`fixed inset-y-0 left-0 z-40 flex w-full max-w-md flex-col border-r border-fg-dim/30 bg-bg-deep/95 px-10 pt-24 pb-8 backdrop-blur transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "-translate-x-full"

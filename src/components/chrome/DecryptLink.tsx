@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { scrambleStep } from "@/lib/decrypt";
-import { playSfx, type SfxName } from "@/lib/sfx";
+import { useScramble } from "@/hooks/useScramble";
+import type { SfxName } from "@/lib/sfx";
 
 type DecryptLinkProps = {
   label: string;
@@ -26,70 +25,24 @@ export default function DecryptLink({
   as,
   tickSfx = "tick",
 }: DecryptLinkProps) {
-  const [display, setDisplay] = useState(label);
-  const rafTimer = useRef<number | null>(null);
-  const startedAt = useRef<number | null>(null);
+  const { display, scrambleTo, snapTo } = useScramble(label, {
+    duration: durationMs,
+    interval: tickMs,
+    sfx: tickSfx,
+    sfxEvery: 2,
+  });
 
-  const stopAnim = useCallback(() => {
-    if (rafTimer.current !== null) {
-      window.clearInterval(rafTimer.current);
-      rafTimer.current = null;
-    }
-    startedAt.current = null;
-    setDisplay(label);
-  }, [label]);
-
-  const runAnim = useCallback(() => {
-    if (typeof window === "undefined") return;
-    if (rafTimer.current !== null) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) {
-      setDisplay(label);
-      return;
-    }
-    startedAt.current = performance.now();
-    let tickCount = 0;
-    rafTimer.current = window.setInterval(() => {
-      const elapsed = performance.now() - (startedAt.current ?? 0);
-      const progress = Math.min(1, elapsed / durationMs);
-      const revealedCount = Math.floor(progress * label.length);
-      setDisplay(scrambleStep(label, revealedCount));
-      if (tickCount % 2 === 0) playSfx(tickSfx);
-      tickCount += 1;
-      if (progress >= 1) {
-        window.clearInterval(rafTimer.current!);
-        rafTimer.current = null;
-        setDisplay(label);
-      }
-    }, tickMs);
-  }, [label, durationMs, tickMs, tickSfx]);
-
-  useEffect(() => {
-    return () => {
-      if (rafTimer.current !== null) {
-        window.clearInterval(rafTimer.current);
-        rafTimer.current = null;
-      }
-    };
-  }, []);
-
-  const handleEnter = () => {
-    runAnim();
-  };
-
-  const handleLeave = () => {
-    stopAnim();
-  };
-
-  const handleClick = () => {
-    onClick?.();
-  };
+  const handleEnter = () => scrambleTo(label);
+  const handleLeave = () => snapTo(label);
+  const handleClick = () => onClick?.();
 
   const common = {
     "aria-label": label,
     className,
     onMouseEnter: handleEnter,
     onMouseLeave: handleLeave,
+    onFocus: handleEnter,
+    onBlur: handleLeave,
     onClick: handleClick,
   } as const;
 

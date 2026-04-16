@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { GLOBE_DATA } from "@/lib/globe-data";
+import {
+  DIZZY_FACE_DATA, DIZZY_FACE_CHARS, DIZZY_CHEEK_DATA,
+  ANGRY_FACE_DATA, ANGRY_FACE_CHARS,
+  ANGRY_MARK_DATA, ANGRY_MARK_CHARS, ANGRY_MARK_CENTER,
+} from "@/lib/globe-face-data";
 
 const BODY_COLOR: [number, number, number] = [250, 220, 120];
 const FACE_COLOR: [number, number, number] = [20, 255, 200];
@@ -35,7 +40,6 @@ const RING_WIDTH = 0.05;      // radians — ring falloff width
 const DRIFT_AMOUNT = 0.00008;
 const SPRING_BACK = 0.015;
 const MAX_DISPLACEMENT = 0.15;
-const GLOBE_SCALE = 1;         // globe render scale
 const SPIN_DELAY = 1;         // seconds before auto-rotation starts
 // --- Face state triggers ---
 const DIZZY_THRESHOLD = 3 * 2 * Math.PI; // 3 full rotations
@@ -60,10 +64,6 @@ const WOBBLE_AMP_X = 0.08;
 const WOBBLE_AMP_Y = 0.06;
 
 // --- Face mask geometry ---
-const LEFT_EYE_CX = -0.42;
-const RIGHT_EYE_CX = 0.42;
-const EYE_CY = 0.0;
-const MOUTH_CY = 0.22;
 const EYE_MOUTH_Y_SPLIT = 0.17; // Y threshold: eye (below) vs mouth (above)
 
 // Dizzy eye spin centers and speed
@@ -71,111 +71,6 @@ const LEYE_CX = -0.3685, LEYE_CY = -0.0786;
 const REYE_CX = 0.3784, REYE_CY = -0.0903;
 const EYE_SPIN_SPEED = 1.2;
 
-// Dizzy face particles — @~@ spiral eyes and ~ mouth (baseTp=5)
-const DIZZY_FACE_DATA: [number, number, number][] = [
-  [-.343,-.274,.899],[.334,-.268,.904],[.376,-.268,.887],[-.471,-.252,.845],[-.448,-.252,.858],
-  [-.365,-.252,.897],[-.32,-.252,.914],[-.3,-.252,.92],[.312,-.246,.918],[.357,-.246,.901],
-  [.376,-.246,.893],[.421,-.246,.873],[.44,-.246,.864],[-.493,-.229,.839],[-.448,-.229,.864],
-  [-.278,-.229,.933],[.27,-.223,.937],[.312,-.223,.924],[.421,-.223,.879],[.462,-.223,.858],
-  [-.512,-.21,.833],[.228,-.204,.952],[-.535,-.187,.824],[-.236,-.187,.953],[.228,-.182,.957],
-  [.248,-.182,.952],[.485,-.182,.855],[-.557,-.165,.814],[-.535,-.165,.828],[-.407,-.165,.899],
-  [-.384,-.165,.909],[-.365,-.165,.917],[-.343,-.165,.925],[-.236,-.165,.958],[.205,-.159,.966],
-  [.334,-.159,.929],[.485,-.159,.86],[-.429,-.145,.892],[-.407,-.145,.902],[-.384,-.145,.912],
-  [-.365,-.145,.92],[-.214,-.145,.966],[.205,-.139,.969],[.357,-.139,.924],[.376,-.139,.916],
-  [.398,-.139,.907],[.505,-.139,.852],[-.557,-.123,.821],[-.471,-.123,.873],[-.429,-.123,.895],
-  [-.343,-.123,.931],[.205,-.117,.972],[.312,-.117,.943],[.485,-.117,.866],[.505,-.117,.855],
-  [-.214,-.1,.972],[.312,-.094,.945],[.462,-.094,.882],[.485,-.094,.869],[.569,-.094,.817],
-  [-.471,-.081,.878],[-.32,-.081,.944],[-.3,-.081,.95],[-.214,-.081,.973],[.205,-.075,.976],
-  [.485,-.075,.871],[.569,-.075,.819],[-.493,-.059,.868],[-.343,-.059,.938],[-.32,-.059,.946],
-  [-.191,-.059,.98],[.205,-.053,.977],[.312,-.053,.949],[.357,-.053,.933],[.462,-.053,.885],
-  [.569,-.053,.821],[-.493,-.036,.869],[-.471,-.036,.881],[-.384,-.036,.923],[-.365,-.036,.93],
-  [-.32,-.036,.947],[-.3,-.036,.953],[-.191,-.036,.981],[.205,-.03,.978],[.376,-.03,.926],
-  [.398,-.03,.917],[.55,-.03,.835],[-.384,-.017,.923],[-.365,-.017,.931],[-.343,-.017,.939],
-  [-.236,-.017,.972],[-.214,-.017,.977],[.228,-.011,.974],[.398,-.011,.917],[.55,-.011,.835],
-  [-.493,.005,.87],[-.471,.005,.882],[-.448,.005,.894],[-.255,.005,.967],[-.236,.005,.972],
-  [-.214,.005,.977],[.527,.011,.85],[-.471,.028,.882],[-.448,.028,.894],[-.429,.028,.903],
-  [-.278,.028,.96],[.27,.034,.962],[.293,.034,.956],[-.448,.048,.893],[-.384,.048,.922],
-  [-.3,.048,.953],[-.278,.048,.959],[.334,.053,.941],[.421,.053,.905],[.44,.053,.896],
-  [.462,.053,.885],[-.429,.07,.901],[-.407,.07,.911],[-.365,.07,.929],[-.343,.07,.937],
-  [-.32,.07,.945],[-.3,.07,.951],[.312,.075,.947],[.334,.075,.94],[.357,.075,.931],
-  [.376,.075,.924],[.398,.075,.914],[.462,.075,.883],
-];
-const DIZZY_FACE_CHARS = ["@", "0", "O", "#", "%", "&"];
-
-// Dizzy cheek particles — wavy ~ line (baseTp=6)
-const DIZZY_CHEEK_DATA: [number, number, number][] = [
-  [-.22,.25,.943],[-.207,.247,.947],[-.194,.238,.952],[-.181,.226,.957],[-.168,.212,.963],
-  [-.155,.2,.967],[-.142,.192,.971],[-.129,.19,.973],[-.116,.194,.974],[-.104,.204,.973],
-  [-.091,.217,.972],[-.078,.231,.97],[-.065,.242,.968],[-.052,.249,.967],[-.039,.249,.968],
-  [-.026,.244,.969],[-.013,.233,.972],[0,.22,.975],[.013,.207,.978],[.026,.196,.98],
-  [.039,.191,.981],[.052,.191,.98],[.065,.198,.978],[.078,.209,.975],[.091,.223,.971],
-  [.104,.236,.966],[.116,.246,.962],[.129,.25,.96],[.142,.248,.958],[.155,.24,.958],
-  [.168,.228,.959],[.181,.214,.96],[.194,.202,.96],[.207,.193,.959],[.22,.19,.957],
-];
-
-// Angry face particles — brows, eyes, frown (left eye mirrored to right for symmetry)
-const ANGRY_FACE_DATA: [number, number, number][] = [
-  [-.526,-.028,.85],[-.478,.003,.878],[-.503,.023,.864],[-.456,.032,.889],[-.478,.051,.877],
-  [-.456,.055,.888],[-.41,.063,.91],[-.385,.068,.92],[-.339,.077,.938],[-.41,.086,.908],
-  [-.385,.091,.918],[-.362,.095,.927],[-.339,.1,.936],[-.317,.104,.943],[-.292,.108,.95],
-  [-.246,.117,.962],[-.223,.121,.967],[-.199,.126,.972],[-.176,.13,.976],[-.153,.134,.979],
-  [-.362,.118,.925],[-.339,.123,.933],[-.317,.127,.94],[-.292,.131,.947],[-.269,.136,.954],
-  [-.246,.14,.959],[-.223,.144,.964],[-.199,.149,.969],[-.176,.153,.972],[-.153,.157,.976],
-  [-.128,.162,.978],[-.106,.166,.98],[-.339,.147,.929],[-.317,.151,.936],[-.292,.155,.944],
-  [-.269,.16,.95],[-.246,.164,.955],[-.199,.173,.965],[-.176,.177,.968],[-.128,.186,.974],
-  [-.106,.19,.976],[-.339,.174,.924],[-.317,.174,.932],[-.292,.174,.94],[-.269,.174,.947],
-  [-.246,.174,.953],[-.317,.197,.928],[-.269,.197,.943],[-.339,.222,.914],[-.292,.222,.93],
-  [-.269,.222,.937],[.526,-.028,.85],[.478,.003,.878],[.503,.023,.864],[.456,.032,.889],
-  [.478,.051,.877],[.456,.055,.888],[.41,.063,.91],[.385,.068,.92],[.339,.077,.938],
-  [.41,.086,.908],[.385,.091,.918],[.362,.095,.927],[.339,.1,.935],[.317,.104,.943],
-  [.292,.108,.95],[.246,.117,.962],[.223,.121,.967],[.199,.126,.972],[.176,.13,.976],
-  [.153,.134,.979],[.362,.118,.925],[.339,.123,.933],[.317,.127,.94],[.292,.131,.947],
-  [.269,.136,.953],[.246,.14,.959],[.223,.144,.964],[.199,.149,.969],[.176,.153,.972],
-  [.153,.157,.976],[.128,.162,.978],[.106,.166,.98],[.339,.147,.929],[.317,.151,.936],
-  [.292,.155,.944],[.269,.16,.95],[.246,.164,.955],[.199,.173,.965],[.176,.177,.968],
-  [.128,.186,.974],[.106,.19,.976],[.339,.174,.925],[.317,.174,.932],[.292,.174,.94],
-  [.269,.174,.947],[.246,.174,.954],[.317,.197,.928],[.269,.197,.943],[.339,.222,.914],
-  [.292,.222,.93],[.269,.222,.937],
-  [-.125,.423,.897],[-.1,.413,.905],[-.075,.405,.911],[-.05,.4,.915],[-.025,.396,.918],
-  [0,.395,.919],[.025,.396,.918],[.05,.4,.915],[.075,.405,.911],[.1,.413,.905],
-  [.125,.423,.897],[-.1,.435,.895],[-.075,.427,.901],[-.05,.422,.905],[-.025,.418,.908],
-  [0,.417,.909],[.025,.418,.908],[.05,.422,.905],[.075,.427,.901],[.1,.435,.895],
-];
-const ANGRY_FACE_CHARS = ["X", "V", "#", "@", "%", "W"];
-
-// Angry stress mark particles — upper-right of globe, breathing pulse
-const ANGRY_MARK_DATA: [number, number, number][] = [
-  [.566,-.526,.635],[.555,-.515,.653],[.577,-.515,.634],[.566,-.504,.652],[.577,-.504,.643],
-  [.555,-.493,.67],[.566,-.493,.661],[.577,-.493,.651],[.632,-.493,.598],[.335,-.482,.81],
-  [.346,-.482,.805],[.533,-.482,.695],[.632,-.482,.607],[.643,-.482,.595],[.335,-.471,.816],
-  [.346,-.471,.811],[.533,-.471,.703],[.632,-.471,.615],[.335,-.46,.822],[.346,-.46,.818],
-  [.368,-.46,.808],[.379,-.46,.803],[.555,-.46,.693],[.599,-.46,.655],[.61,-.46,.645],
-  [.632,-.46,.624],[.335,-.449,.828],[.522,-.449,.725],[.533,-.449,.717],[.544,-.449,.709],
-  [.599,-.449,.663],[.357,-.438,.825],[.368,-.438,.82],[.401,-.427,.81],[.434,-.427,.793],
-  [.489,-.427,.761],[.522,-.427,.738],[.577,-.427,.696],[.302,-.416,.858],[.423,-.416,.805],
-  [.456,-.416,.787],[.577,-.416,.703],[.324,-.405,.855],[.335,-.405,.851],[.456,-.405,.792],
-  [.467,-.405,.786],[.566,-.405,.718],[.335,-.394,.856],[.357,-.394,.847],[.445,-.394,.804],
-  [.335,-.383,.861],[.357,-.383,.852],[.379,-.383,.842],[.577,-.383,.721],[.346,-.372,.861],
-  [.357,-.372,.857],[.566,-.372,.736],[.346,-.361,.866],[.357,-.361,.862],[.368,-.361,.857],
-  [.39,-.361,.847],[.401,-.361,.842],[.566,-.35,.746],[.39,-.339,.856],[.412,-.339,.846],
-  [.423,-.339,.84],[.588,-.339,.734],[.599,-.339,.725],[.423,-.328,.845],[.577,-.328,.748],
-  [.588,-.328,.739],[.599,-.328,.73],[.61,-.328,.721],[.401,-.317,.859],[.577,-.317,.753],
-  [.588,-.306,.749],[.599,-.306,.74],[.401,-.295,.867],[.412,-.295,.862],[.423,-.295,.857],
-  [.643,-.295,.707],[.665,-.284,.691],[.676,-.284,.68],[.401,-.273,.874],[.423,-.273,.864],
-  [.544,-.273,.793],[.632,-.273,.725],[.654,-.273,.706],[.687,-.273,.673],[.423,-.262,.867],
-  [.544,-.262,.797],[.555,-.262,.79],[.676,-.262,.689],[.709,-.262,.655],[.39,-.251,.886],
-  [.478,-.251,.842],[.5,-.251,.829],[.511,-.251,.822],[.522,-.251,.815],[.544,-.251,.801],
-  [.588,-.251,.769],[.698,-.251,.671],[.412,-.24,.879],[.478,-.24,.845],[.555,-.24,.796],
-  [.599,-.24,.764],[.379,-.229,.897],[.456,-.229,.86],[.478,-.229,.848],[.489,-.229,.842],
-  [.599,-.229,.767],[.61,-.229,.759],[.643,-.229,.731],[.357,-.218,.908],[.379,-.218,.899],
-  [.599,-.218,.771],[.61,-.218,.762],[.621,-.218,.753],[.368,-.207,.906],[.39,-.207,.897],
-  [.434,-.207,.877],[.456,-.207,.866],[.643,-.207,.737],[.654,-.207,.728],[.346,-.196,.918],
-  [.357,-.196,.913],[.423,-.196,.885],[.434,-.196,.879],[.456,-.196,.868],[.654,-.196,.731],
-  [.368,-.185,.911],[.423,-.185,.887],[.456,-.185,.871],[.643,-.185,.743],[.357,-.174,.918],
-  [.423,-.174,.889],[.434,-.174,.884],[.401,-.152,.903],[.434,-.152,.888],[.423,-.141,.895],
-];
-const ANGRY_MARK_CHARS = ["*", "X", "+", "#", "%"];
-const ANGRY_MARK_CENTER: [number, number, number] = [0.491, -0.332, 0.787];
 
 const BODY_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789@#%&*+-~";
 const FACE_CHARS = ["U", "W", "#", "@", "%"];
@@ -193,7 +88,6 @@ const SPARKLE_INTERVAL_MIN = 0.2;
 const SPARKLE_INTERVAL_MAX = 0.5;
 const STAR_DRIFT_AMP = 4;   // px
 const STAR_DRIFT_FREQ = 0.4; // Hz
-const STAR_PARALLAX = 0.2;
 const STAR_SPRING = 0.015;
 const STAR_DAMPING = 0.94;
 const STAR_MAX_DISP = 20;
@@ -321,11 +215,13 @@ function buildStars(W: number, H: number, globeRadius: number): Star[] {
 
   for (let i = 0; i < STAR_COUNT; i++) {
     let x: number, y: number;
+    let attempts = 0;
     do {
       const angle = Math.random() * Math.PI * 2;
       const dist = exclusion + Math.random() * (maxDist - exclusion);
       x = cx + Math.cos(angle) * dist;
       y = cy + Math.sin(angle) * dist;
+      if (++attempts > 200) { x = Math.random() * W; y = Math.random() * H; break; }
     } while (x < 0 || x > W || y < 0 || y > H);
 
     const color = STAR_COLORS[Math.random() < 0.5 ? 0 : 1];
@@ -465,12 +361,52 @@ export default function UwuGlobe() {
     const onMotionChange = (e: MediaQueryListEvent) => { reducedMotion = e.matches; };
     motionMql.addEventListener("change", onMotionChange);
 
+    // --- Glyph bitmap cache ---
+    // Pre-renders each unique char+size+bold+color to an offscreen canvas.
+    // drawImage from a cached bitmap is 5-10× faster than fillText.
+    let cacheDpr = window.devicePixelRatio || 1;
+    const measureCtx = document.createElement("canvas").getContext("2d")!;
+    const glyphCache = new Map<string, { cv: HTMLCanvasElement; ox: number; oy: number; w: number; h: number }>();
+
+    const getGlyph = (
+      ch: string, size: number, bold: boolean,
+      r: number, g: number, b: number,
+    ) => {
+      const key = `${ch}|${size}|${bold ? 1 : 0}|${r}|${g}|${b}`;
+      const hit = glyphCache.get(key);
+      if (hit) return hit;
+
+      const fontStr = `${bold ? "bold " : ""}${size}px ${FONT}`;
+      measureCtx.font = fontStr;
+      const m = measureCtx.measureText(ch);
+      const pad = 2;
+      const w = Math.ceil(m.width) + pad * 2;
+      const h = Math.ceil(size * 1.3) + pad * 2;
+
+      const gcv = document.createElement("canvas");
+      gcv.width = w * cacheDpr;
+      gcv.height = h * cacheDpr;
+      const gc = gcv.getContext("2d")!;
+      gc.scale(cacheDpr, cacheDpr);
+      gc.font = fontStr;
+      gc.textAlign = "center";
+      gc.textBaseline = "middle";
+      gc.fillStyle = `rgb(${r},${g},${b})`;
+      gc.fillText(ch, w / 2, h / 2);
+
+      const entry = { cv: gcv, ox: w / 2, oy: h / 2, w, h };
+      glyphCache.set(key, entry);
+      return entry;
+    };
+
     let W = 0, H = 0;
     let rotY = 0, rotX = DEF_RX, autoRotY = Math.PI - (20 * Math.PI / 180);
     let dragging = false, lastX = 0, lastY = 0;
     let spinVelocity = DEF_VY;
     let mouseX = -9000, mouseY = -9000, mouseActive = false;
     let stars = buildStars(W || window.innerWidth, H || window.innerHeight, Math.min(W || 400, H || 400, 700) * 0.38);
+    let prevT = performance.now() / 1000;
+    const projected: { i: number; sx: number; sy: number; sz: number; sc: number; ry: number }[] = [];
     let dragDx = 0, dragDy = 0;
     let dragStartTime = 0;
     let dragTotalDx = 0;
@@ -546,6 +482,10 @@ export default function UwuGlobe() {
       cv.style.height = `${H}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       stars = buildStars(W, H, Math.min(W, H, 700) * 0.38);
+      if (dpr !== cacheDpr) {
+        cacheDpr = dpr;
+        glyphCache.clear();
+      }
     };
 
     const rotate3D = (x: number, y: number, z: number): [number, number, number] => {
@@ -576,22 +516,26 @@ export default function UwuGlobe() {
 
     const frame = () => {
       const t = performance.now() / 1000;
+      const dt = t - prevT;
+      prevT = t;
       const elapsed = (performance.now() - startTime) / 1000;
       const reduced = reducedMotion;
+      const dtScale = dt * 60; // normalize to 60fps baseline
 
-      if (!dragging && !shaking) {
+      if (!dragging && !shaking && !reduced) {
         // Wait SPIN_DELAY seconds before starting auto-rotation
         if (elapsed > SPIN_DELAY) {
-          autoRotY += spinVelocity;
+          autoRotY += spinVelocity * dtScale;
         }
-        rotX += (DEF_RX - rotX) * 0.035;
+        const recoveryEase = 1 - Math.pow(1 - 0.035, dtScale);
+        rotX += (DEF_RX - rotX) * recoveryEase;
       }
 
       // --- Face state triggers ---
       if (Math.abs(spinVelocity) > DIZZY_SPEED_THRESHOLD) {
-        cumulativeSpin += Math.abs(spinVelocity);
+        cumulativeSpin += Math.abs(spinVelocity) * dtScale;
       }
-      cumulativeSpin *= SPIN_DECAY;
+      cumulativeSpin *= Math.pow(SPIN_DECAY, dtScale);
 
       if (dragging) {
         dragFrames++;
@@ -632,7 +576,8 @@ export default function UwuGlobe() {
         const se = (performance.now() - shakeStart) / 1000;
         const decay = Math.exp(-se * SHAKE_DAMPING);
         rotY = Math.sin(se * SHAKE_FREQ) * SHAKE_AMP * decay;
-        rotX += (DEF_RX - rotX) * 0.035;
+        const shakeEase = 1 - Math.pow(1 - 0.035, dtScale);
+        rotX += (DEF_RX - rotX) * shakeEase;
       }
 
       ctx.clearRect(0, 0, W, H);
@@ -665,11 +610,12 @@ export default function UwuGlobe() {
         s.vx += dragDx * parallax;
         s.vy += dragDy * parallax;
 
-        // Spring-back
+        // Spring-back (dt-corrected damping)
         s.vx -= s.dx * STAR_SPRING;
         s.vy -= s.dy * STAR_SPRING;
-        s.vx *= STAR_DAMPING;
-        s.vy *= STAR_DAMPING;
+        const starDamp = Math.pow(STAR_DAMPING, dtScale);
+        s.vx *= starDamp;
+        s.vy *= starDamp;
         s.dx += s.vx;
         s.dy += s.vy;
 
@@ -682,7 +628,7 @@ export default function UwuGlobe() {
 
         // Sparkle logic
         if (!reduced && s.sparkleTime >= 0) {
-          s.sparkleTime += 1 / 60;
+          s.sparkleTime += dt;
           if (s.sparkleTime >= SPARKLE_DURATION) {
             s.sparkleTime = -1;
             s.ch = s.baseCh;
@@ -695,7 +641,7 @@ export default function UwuGlobe() {
             s.alpha = s.baseAlpha + (1.0 - s.baseAlpha) * Math.sin(progress * Math.PI);
           }
         } else {
-          s.cooldown -= 1 / 60;
+          s.cooldown -= dt;
         }
 
         // Drift
@@ -710,17 +656,17 @@ export default function UwuGlobe() {
         const globeR = Math.min(W, H, 700) * 0.38;
         if (distFromCenter < globeR) continue;
 
-        ctx.font = `${s.fontSize.toFixed(1)}px ${FONT}`;
-        // Glow layer when sparkling
+        const starSz = Math.round(s.fontSize);
+        // Glow layer when sparkling (cached bitmap)
         if (s.sparkleTime >= 0) {
-          const glowAlpha = (s.alpha * 0.3).toFixed(2);
-          ctx.font = `${(s.fontSize * 1.6).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${glowAlpha})`;
-          ctx.fillText(s.ch, fx, fy);
-          ctx.font = `${s.fontSize.toFixed(1)}px ${FONT}`;
+          const sg = getGlyph(s.ch, Math.round(s.fontSize * 1.6), false, s.color[0], s.color[1], s.color[2]);
+          ctx.globalAlpha = s.alpha * 0.3;
+          ctx.drawImage(sg.cv, fx - sg.ox, fy - sg.oy, sg.w, sg.h);
         }
-        ctx.fillStyle = `rgba(${s.color[0]},${s.color[1]},${s.color[2]},${s.alpha.toFixed(2)})`;
-        ctx.fillText(s.ch, fx, fy);
+        const sg = getGlyph(s.ch, starSz, false, s.color[0], s.color[1], s.color[2]);
+        ctx.globalAlpha = s.alpha;
+        ctx.drawImage(sg.cv, fx - sg.ox, fy - sg.oy, sg.w, sg.h);
+        ctx.globalAlpha = 1;
       }
 
       // Dark circle behind globe to mask the dot grid background
@@ -736,7 +682,7 @@ export default function UwuGlobe() {
       ctx.fillStyle = grad;
       ctx.fill();
 
-      const projected: { i: number; sx: number; sy: number; sz: number; sc: number; ry: number }[] = [];
+      projected.length = 0;
 
       // Unproject mouse onto sphere surface, then to world space
       const base = Math.min(W, H, 700);
@@ -781,28 +727,31 @@ export default function UwuGlobe() {
           if (r2 < 0.99) { pbx = rx2; pby = ry2; pbz = Math.sqrt(1 - r2); }
         }
 
-        p.vx += Math.sin(t * 0.7 + p.bx * 5) * DRIFT_AMOUNT;
-        p.vy += Math.cos(t * 0.9 + p.by * 5) * DRIFT_AMOUNT;
-        p.vz += Math.sin(t * 1.1 + p.bz * 5) * DRIFT_AMOUNT;
+        if (!reduced) {
+          p.vx += Math.sin(t * 0.7 + p.bx * 5) * DRIFT_AMOUNT * dtScale;
+          p.vy += Math.cos(t * 0.9 + p.by * 5) * DRIFT_AMOUNT * dtScale;
+          p.vz += Math.sin(t * 1.1 + p.bz * 5) * DRIFT_AMOUNT * dtScale;
 
-        p.vx -= p.dx * SPRING_BACK;
-        p.vy -= p.dy * SPRING_BACK;
-        p.vz -= p.dz * SPRING_BACK;
+          p.vx -= p.dx * SPRING_BACK * dtScale;
+          p.vy -= p.dy * SPRING_BACK * dtScale;
+          p.vz -= p.dz * SPRING_BACK * dtScale;
 
-        p.vx *= 0.94; p.vy *= 0.94; p.vz *= 0.94;
-        p.dx += p.vx; p.dy += p.vy; p.dz += p.vz;
+          const pDamp = Math.pow(0.94, dtScale);
+          p.vx *= pDamp; p.vy *= pDamp; p.vz *= pDamp;
+          p.dx += p.vx; p.dy += p.vy; p.dz += p.vz;
 
-        const dm = Math.sqrt(p.dx * p.dx + p.dy * p.dy + p.dz * p.dz);
-        if (dm > MAX_DISPLACEMENT) {
-          const s = MAX_DISPLACEMENT / dm;
-          p.dx *= s; p.dy *= s; p.dz *= s;
+          const dm = Math.sqrt(p.dx * p.dx + p.dy * p.dy + p.dz * p.dz);
+          if (dm > MAX_DISPLACEMENT) {
+            const s = MAX_DISPLACEMENT / dm;
+            p.dx *= s; p.dy *= s; p.dz *= s;
+          }
         }
 
         const [rx, ry, rz] = rotate3D(pbx + p.dx, pby + p.dy, pbz + p.dz);
         const [sx, sy, sz, sc] = project(rx, ry, rz);
 
         // 3D sphere-mapped repulsion — front-facing only
-        if (mouseOnSphere && rz < 0) {
+        if (!reduced && mouseOnSphere && rz < 0) {
           const dot = p.bx * mwx + p.by * mwy + p.bz * mwz;
           const angDist = Math.acos(Math.max(-1, Math.min(1, dot)));
           if (angDist < REPULSE_ANGLE) {
@@ -812,9 +761,9 @@ export default function UwuGlobe() {
             const force = ring * variation * REPULSE_FORCE;
             const dx = p.bx - mwx, dy = p.by - mwy, dz = p.bz - mwz;
             const dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-            p.vx += (dx / dl) * force * 0.012;
-            p.vy += (dy / dl) * force * 0.012;
-            p.vz += (dz / dl) * force * 0.012;
+            p.vx += (dx / dl) * force * 0.012 * dtScale;
+            p.vy += (dy / dl) * force * 0.012 * dtScale;
+            p.vz += (dz / dl) * force * 0.012 * dtScale;
           }
         }
 
@@ -833,6 +782,22 @@ export default function UwuGlobe() {
       // Color lerp progress (0..1)
       const lerpT = Math.min(1, (performance.now() - colorLerpStart) / COLOR_LERP_DURATION);
 
+      // Draw a glyph with optional glow underlay (fillText for correct glow compositing)
+      const drawGlyph = (
+        ch: string, x: number, y: number, fontSize: number, bold: boolean,
+        color: [number, number, number], alpha: number,
+        glowColor?: [number, number, number], glowMul?: number,
+      ) => {
+        const sz = Math.round(fontSize);
+        ctx.font = `${bold ? "bold " : ""}${sz}px ${FONT}`;
+        if (glowColor && glowMul) {
+          ctx.fillStyle = `rgba(${glowColor[0]},${glowColor[1]},${glowColor[2]},${(alpha * glowMul).toFixed(2)})`;
+          ctx.fillText(ch, x, y);
+        }
+        ctx.fillStyle = `rgba(${color[0] | 0},${color[1] | 0},${color[2] | 0},${alpha.toFixed(2)})`;
+        ctx.fillText(ch, x, y);
+      };
+
       for (const pr of projected) {
         const p = particles[pr.i];
         if (p.role === "hidden") continue;
@@ -842,57 +807,28 @@ export default function UwuGlobe() {
         const glow = 0.3 + Math.sin(p.pulse) * 0.1;
         const fs = Math.max(7, Math.min(18, pr.sc * 0.09));
 
-        if (p.role === "eye") {
+        if (p.role === "eye" || p.role === "mouth") {
           const al = Math.min(facing, 1) * (glow + 0.7);
-          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${FACE_GLOW[0]},${FACE_GLOW[1]},${FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
-          ctx.fillStyle = `rgba(${FACE_COLOR[0]},${FACE_COLOR[1]},${FACE_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
-        } else if (p.role === "mouth") {
-          const al = Math.min(facing, 1) * (glow + 0.7);
-          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${FACE_GLOW[0]},${FACE_GLOW[1]},${FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
-          ctx.fillStyle = `rgba(${FACE_COLOR[0]},${FACE_COLOR[1]},${FACE_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
+          drawGlyph(p.ch, pr.sx, pr.sy, fs * 1.3, true, FACE_COLOR, al, FACE_GLOW, 0.25);
         } else if (p.role === "cheek") {
           const al = Math.min(facing, 1) * (glow + 0.6);
-          ctx.font = `bold ${(fs * 1.2).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${CHEEK_COLOR[0]},${CHEEK_COLOR[1]},${CHEEK_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
+          drawGlyph(p.ch, pr.sx, pr.sy, fs * 1.2, true, CHEEK_COLOR, al);
         } else if (p.role === "angryface") {
-          // Angry face features — red with glow
           const al = Math.min(facing, 1) * (glow + 0.7);
-          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${ANGRY_FACE_GLOW[0]},${ANGRY_FACE_GLOW[1]},${ANGRY_FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
-          ctx.fillStyle = `rgba(${ANGRY_FACE_COLOR[0]},${ANGRY_FACE_COLOR[1]},${ANGRY_FACE_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
+          drawGlyph(p.ch, pr.sx, pr.sy, fs * 1.3, true, ANGRY_FACE_COLOR, al, ANGRY_FACE_GLOW, 0.25);
         } else if (p.role === "stressmark") {
-          // Stress mark — pulsing red
           const pulse = 0.85 + 0.15 * Math.sin(t * 3.5);
           const al = Math.min(facing, 1) * (glow + 0.7) * pulse;
           const mfs = fs * 1.2 * (0.9 + 0.2 * Math.sin(t * 3.5));
-          ctx.font = `bold ${mfs.toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${ANGRY_MARK_GLOW[0]},${ANGRY_MARK_GLOW[1]},${ANGRY_MARK_GLOW[2]},${(al * 0.3).toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
-          ctx.fillStyle = `rgba(${ANGRY_MARK_COLOR[0]},${ANGRY_MARK_COLOR[1]},${ANGRY_MARK_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
+          drawGlyph(p.ch, pr.sx, pr.sy, mfs, true, ANGRY_MARK_COLOR, al, ANGRY_MARK_GLOW, 0.3);
         } else if (p.role === "dizzyface") {
           const al = Math.min(facing, 1) * (glow + 0.7);
-          ctx.font = `bold ${(fs * 1.3).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${DIZZY_FACE_GLOW[0]},${DIZZY_FACE_GLOW[1]},${DIZZY_FACE_GLOW[2]},${(al * 0.25).toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
-          ctx.fillStyle = `rgba(${DIZZY_FACE_COLOR[0]},${DIZZY_FACE_COLOR[1]},${DIZZY_FACE_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
+          drawGlyph(p.ch, pr.sx, pr.sy, fs * 1.3, true, DIZZY_FACE_COLOR, al, DIZZY_FACE_GLOW, 0.25);
         } else if (p.role === "dizzycheek") {
           const al = Math.min(facing, 1) * (glow + 0.6);
-          ctx.font = `bold ${(fs * 1.2).toFixed(1)}px ${FONT}`;
-          ctx.fillStyle = `rgba(${DIZZY_CHEEK_COLOR[0]},${DIZZY_CHEEK_COLOR[1]},${DIZZY_CHEEK_COLOR[2]},${al.toFixed(2)})`;
-          ctx.fillText(p.ch, pr.sx, pr.sy);
+          drawGlyph(p.ch, pr.sx, pr.sy, fs * 1.2, true, DIZZY_CHEEK_COLOR, al);
         } else {
-          // Body — color depends on face state
+          // Body — uses fillText (color varies per-particle during distressed gradient)
           let bodyColor: [number, number, number];
           if (faceState === "distressed") {
             bodyColor = angryBodyColor(pr.ry);
@@ -901,7 +837,6 @@ export default function UwuGlobe() {
           } else {
             bodyColor = BODY_COLOR;
           }
-          // Lerp from previous state's color if transitioning
           if (lerpT < 1) {
             let prevColor: [number, number, number];
             if (prevFaceState === "distressed") {
@@ -914,7 +849,7 @@ export default function UwuGlobe() {
             bodyColor = lerpColor(prevColor, bodyColor, lerpT);
           }
           const al = Math.min(facing, 1) * (glow + 0.35);
-          ctx.font = `${fs.toFixed(1)}px ${FONT}`;
+          ctx.font = `${Math.round(fs)}px ${FONT}`;
           ctx.fillStyle = `rgba(${bodyColor[0] | 0},${bodyColor[1] | 0},${bodyColor[2] | 0},${al.toFixed(2)})`;
           ctx.fillText(p.ch, pr.sx, pr.sy);
         }
@@ -924,29 +859,24 @@ export default function UwuGlobe() {
     };
 
     // Input handlers
-    const onMouseDown = (e: MouseEvent) => {
+    // --- Shared drag helpers (mouse + touch) ---
+    const startDrag = (clientX: number, clientY: number) => {
       if (shakeLocked) return;
-      e.preventDefault(); // prevent text selection drag
       dragging = true;
       dragStartTime = performance.now();
       dragTotalDx = 0;
-      lastX = e.clientX;
-      lastY = e.clientY;
+      lastX = clientX;
+      lastY = clientY;
     };
 
-    const onMouseMove = (e: MouseEvent) => {
-      const r = container.getBoundingClientRect();
-      mouseX = e.clientX - r.left;
-      mouseY = e.clientY - r.top;
-      mouseActive = mouseX >= 0 && mouseX <= r.width && mouseY >= 0 && mouseY <= r.height;
-
+    const moveDrag = (clientX: number, clientY: number) => {
       if (!dragging) return;
-      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      const dx = clientX - lastX, dy = clientY - lastY;
       rotY += dx * 0.01;
       rotX += dy * 0.01;
       rotX = Math.max(-1.2, Math.min(1.2, rotX));
-      lastX = e.clientX;
-      lastY = e.clientY;
+      lastX = clientX;
+      lastY = clientY;
       dragTotalDx += dx;
       spinVelocity = dx * 0.0008;
       dragDx = dx;
@@ -958,7 +888,6 @@ export default function UwuGlobe() {
       shakeLocked = true;
       dragging = false;
       spinVelocity = 0;
-      // Snap face to front
       const FRONT_FACING = Math.PI;
       autoRotY = Math.round((autoRotY - FRONT_FACING) / (2 * Math.PI)) * 2 * Math.PI + FRONT_FACING;
       rotY = 0;
@@ -972,13 +901,12 @@ export default function UwuGlobe() {
       }, SHAKE_DURATION);
     };
 
-    const onMouseUp = () => {
+    const endDrag = () => {
       if (dragging && performance.now() - dragStartTime < FLICK_WINDOW) {
         spinVelocity = dragTotalDx * FLICK_MULTIPLIER;
       }
       dragging = false;
       if (faceState === "distressed" && !shaking && !shakeLocked) {
-        // User let go — cancel the 3s forced timer, shake in 0.5s
         if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
         cooldownTimer = window.setTimeout(() => {
           cooldownTimer = null;
@@ -991,22 +919,32 @@ export default function UwuGlobe() {
       prevDragDx = 0;
       prevDragDy = 0;
     };
+
+    // --- Mouse handlers ---
+    const onMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
+      startDrag(e.clientX, e.clientY);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      const r = container.getBoundingClientRect();
+      mouseX = e.clientX - r.left;
+      mouseY = e.clientY - r.top;
+      mouseActive = mouseX >= 0 && mouseX <= r.width && mouseY >= 0 && mouseY <= r.height;
+      moveDrag(e.clientX, e.clientY);
+    };
+
+    const onMouseUp = () => { endDrag(); };
     const onMouseLeave = () => { mouseActive = false; };
 
-    // Touch support
+    // --- Touch handlers ---
     const onTouchStart = (e: TouchEvent) => {
-      if (shakeLocked) return;
-      if (e.touches.length === 1) {
-        dragging = true;
-        dragStartTime = performance.now();
-        dragTotalDx = 0;
-        lastX = e.touches[0].clientX;
-        lastY = e.touches[0].clientY;
-        const r = container.getBoundingClientRect();
-        mouseX = e.touches[0].clientX - r.left;
-        mouseY = e.touches[0].clientY - r.top;
-        mouseActive = true;
-      }
+      if (e.touches.length !== 1) return;
+      startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      const r = container.getBoundingClientRect();
+      mouseX = e.touches[0].clientX - r.left;
+      mouseY = e.touches[0].clientY - r.top;
+      mouseActive = true;
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -1015,40 +953,13 @@ export default function UwuGlobe() {
       mouseX = e.touches[0].clientX - r.left;
       mouseY = e.touches[0].clientY - r.top;
       mouseActive = true;
-      if (dragging) {
-        const dx = e.touches[0].clientX - lastX;
-        const dy = e.touches[0].clientY - lastY;
-        rotY += dx * 0.01;
-        rotX += dy * 0.01;
-        rotX = Math.max(-1.2, Math.min(1.2, rotX));
-        lastX = e.touches[0].clientX;
-        lastY = e.touches[0].clientY;
-        dragTotalDx += dx;
-        spinVelocity = dx * 0.0008;
-        dragDx = dx;
-        dragDy = dy;
-      }
+      moveDrag(e.touches[0].clientX, e.touches[0].clientY);
       if (dragging) e.preventDefault();
     };
 
     const onTouchEnd = () => {
-      if (dragging && performance.now() - dragStartTime < FLICK_WINDOW) {
-        spinVelocity = dragTotalDx * FLICK_MULTIPLIER;
-      }
-      dragging = false;
+      endDrag();
       mouseActive = false;
-      if (faceState === "distressed" && !shaking && !shakeLocked) {
-        if (cooldownTimer !== null) window.clearTimeout(cooldownTimer);
-        cooldownTimer = window.setTimeout(() => {
-          cooldownTimer = null;
-          startShake();
-        }, 500);
-      }
-      dragFrames = 0;
-      dirChanges = 0;
-      jerkAccum = 0;
-      prevDragDx = 0;
-      prevDragDy = 0;
     };
 
     resize();
@@ -1084,7 +995,12 @@ export default function UwuGlobe() {
       ref={containerRef}
       className="absolute inset-0 z-[1] flex items-center justify-center"
     >
-      <canvas ref={canvasRef} className="block h-full w-full" />
+      <canvas
+        ref={canvasRef}
+        role="img"
+        aria-label="Interactive 3D ASCII globe"
+        className="block h-full w-full"
+      >Interactive 3D ASCII globe</canvas>
     </div>
   );
 }

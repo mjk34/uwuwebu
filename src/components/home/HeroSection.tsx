@@ -1,34 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { scrambleStep } from "@/lib/decrypt";
-import { playSfx } from "@/lib/sfx";
+import { useScramble } from "@/hooks/useScramble";
 import { menuStore } from "@/lib/menu-store";
 
 const DEFAULT_TEXT = "UwUVERSITY";
 const HOVER_TEXT = "ENROLL. GRIND. ASCEND.";
+const HOVER_PARTS = [
+  { text: "ENROLL. ", className: "text-fg" },
+  { text: "GRIND. ", className: "text-accent" },
+  { text: "ASCEND.", className: "text-danger" },
+] as const;
 const GLITCH_FACES = [
   "OwO", "QwQ", "ÒwÓ", "0w0", "ówò",
 ];
-const GLITCH_IDLE_MIN = 6000; // ms
+const GLITCH_IDLE_MIN = 6000;
 const GLITCH_IDLE_MAX = 12000;
-const GLITCH_HOLD = 1000; // ms to hold the new face
+const GLITCH_HOLD = 1000;
 
 export default function HeroSection() {
-  const [display, setDisplay] = useState(DEFAULT_TEXT);
+  const { display, scrambleTo, stop: stopScramble } = useScramble(DEFAULT_TEXT);
   const [hovered, setHovered] = useState(false);
-  const timerRef = useRef<number | null>(null);
-  const startedAt = useRef<number | null>(null);
   const glitchRef = useRef<number | null>(null);
   const glitchPhaseRef = useRef<number | null>(null);
-
-  const stopAnim = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    startedAt.current = null;
-  }, []);
+  const scheduleGlitchRef = useRef<(() => void) | null>(null);
 
   const stopGlitch = useCallback(() => {
     if (glitchRef.current !== null) {
@@ -41,39 +36,9 @@ export default function HeroSection() {
     }
   }, []);
 
-  const runScramble = useCallback(
-    (target: string, duration = 500, onDone?: () => void) => {
-      stopAnim();
-      const reduced = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      if (reduced) {
-        setDisplay(target);
-        onDone?.();
-        return;
-      }
-      startedAt.current = performance.now();
-      timerRef.current = window.setInterval(() => {
-        const elapsed = performance.now() - (startedAt.current ?? 0);
-        const progress = Math.min(1, elapsed / duration);
-        const revealed = Math.floor(progress * target.length);
-        setDisplay(scrambleStep(target, revealed));
-        if (progress < 1) playSfx("tick");
-        if (progress >= 1) {
-          stopAnim();
-          setDisplay(target);
-          onDone?.();
-        }
-      }, 30);
-    },
-    [stopAnim],
-  );
-
-  // Idle glitch cycle: scramble-in face → hold → scramble-out to UwU
   const scheduleGlitch = useCallback(() => {
     const delay = GLITCH_IDLE_MIN + Math.random() * (GLITCH_IDLE_MAX - GLITCH_IDLE_MIN);
     glitchRef.current = window.setTimeout(() => {
-      // Pick a random face (not the current UwU prefix)
       let face: string;
       do {
         face = GLITCH_FACES[Math.floor(Math.random() * GLITCH_FACES.length)];
@@ -81,26 +46,31 @@ export default function HeroSection() {
 
       const glitchedText = face + DEFAULT_TEXT.slice(3);
 
-      // Scramble-in to the new face (only first 3 chars, fast)
-      runScramble(glitchedText, 250, () => {
-        // Hold for GLITCH_HOLD ms, then scramble back
-        glitchRef.current = window.setTimeout(() => {
-          runScramble(DEFAULT_TEXT, 250, () => {
-            scheduleGlitch();
-          });
-        }, GLITCH_HOLD);
+      scrambleTo(glitchedText, {
+        duration: 250,
+        onDone: () => {
+          glitchRef.current = window.setTimeout(() => {
+            scrambleTo(DEFAULT_TEXT, {
+              duration: 250,
+              onDone: () => scheduleGlitchRef.current?.(),
+            });
+          }, GLITCH_HOLD);
+        },
       });
     }, delay);
-  }, [runScramble]);
+  }, [scrambleTo]);
+
+  useEffect(() => {
+    scheduleGlitchRef.current = scheduleGlitch;
+  }, [scheduleGlitch]);
 
   useEffect(() => {
     return () => {
-      stopAnim();
+      stopScramble();
       stopGlitch();
     };
-  }, [stopAnim, stopGlitch]);
+  }, [stopScramble, stopGlitch]);
 
-  // Start glitch cycle on mount
   useEffect(() => {
     if (!hovered) {
       scheduleGlitch();
@@ -112,15 +82,13 @@ export default function HeroSection() {
     if (hovered) return;
     if (menuStore.getOpen()) return;
     stopGlitch();
-    setDisplay(scrambleStep(HOVER_TEXT, 0));
     setHovered(true);
-    runScramble(HOVER_TEXT);
+    scrambleTo(HOVER_TEXT);
   };
 
   const handleLeave = () => {
-    setDisplay(scrambleStep(DEFAULT_TEXT, 0));
     setHovered(false);
-    runScramble(DEFAULT_TEXT);
+    scrambleTo(DEFAULT_TEXT);
   };
 
   return (
@@ -129,15 +97,28 @@ export default function HeroSection() {
       className="relative z-[2] flex w-full flex-col justify-end overflow-hidden px-4 pb-4 pt-16 sm:px-14 sm:pt-20 lg:px-20"
     >
       <h1
+        tabIndex={0}
+        aria-label={HOVER_TEXT}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
-        className="w-fit cursor-default font-mono text-2xl font-black uppercase leading-[0.95] tracking-tight tabular-nums xs:text-3xl sm:text-5xl lg:text-7xl"
+        onFocus={handleEnter}
+        onBlur={handleLeave}
+        className="w-fit cursor-default font-mono text-2xl font-black uppercase leading-[0.95] tracking-tight tabular-nums outline-none xs:text-3xl sm:text-5xl lg:text-7xl"
       >
         {hovered ? (
           <>
-            <span className="text-fg">{display.slice(0, 8)}</span>
-            <span className="text-accent">{display.slice(8, 15)}</span>
-            <span className="text-danger">{display.slice(15)}</span>
+            {(() => {
+              let pos = 0;
+              return HOVER_PARTS.map((seg) => {
+                const start = pos;
+                pos += seg.text.length;
+                return (
+                  <span key={seg.className} className={seg.className}>
+                    {display.slice(start, pos)}
+                  </span>
+                );
+              });
+            })()}
           </>
         ) : (
           <span className="text-fg">{display}</span>

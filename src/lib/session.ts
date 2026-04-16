@@ -1,3 +1,5 @@
+"use client";
+
 const NS = "uwuversity";
 
 export const SessionKeys = {

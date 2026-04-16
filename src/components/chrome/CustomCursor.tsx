@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
 const DOT_SIZE = 6;
 const RING_SIZE = 36;
 const RING_BORDER = 1.5;
+/** Per-frame lerp at 60 fps — higher = snappier ring follow */
+const RING_EASE = 0.22;
 
 export default function CustomCursor() {
   const dotRef = useRef<HTMLDivElement>(null);
@@ -39,9 +41,16 @@ export default function CustomCursor() {
       if (ringRef.current) ringRef.current.style.opacity = "0";
     };
 
-    const tick = () => {
-      ringPos.current.x += (pos.current.x - ringPos.current.x) * 0.15;
-      ringPos.current.y += (pos.current.y - ringPos.current.y) * 0.15;
+    let prevT = 0;
+    const tick = (t: number) => {
+      const dt = prevT ? (t - prevT) / 1000 : 1 / 60;
+      prevT = t;
+
+      // Frame-rate-independent exponential ease: at 60fps ease≈RING_EASE,
+      // at lower fps the factor grows so the ring doesn't fall behind.
+      const ease = 1 - Math.pow(1 - RING_EASE, dt * 60);
+      ringPos.current.x += (pos.current.x - ringPos.current.x) * ease;
+      ringPos.current.y += (pos.current.y - ringPos.current.y) * ease;
 
       if (ringRef.current) {
         ringRef.current.style.transform = `translate(${ringPos.current.x - RING_SIZE / 2}px, ${ringPos.current.y - RING_SIZE / 2}px)`;

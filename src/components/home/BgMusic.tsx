@@ -5,7 +5,7 @@ import { isMuted } from "@/lib/session";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
-// Expose audio element so mute toggle can reach it directly
+// Singleton — syncBgMusicMute reaches across from MuteToggle
 let bgAudio: HTMLAudioElement | null = null;
 
 export function syncBgMusicMute(mute: boolean): void {
@@ -42,15 +42,14 @@ export default function BgMusic() {
       }, () => {});
     };
     document.addEventListener("pointerdown", tryPlay);
-    document.addEventListener("keydown", tryPlay);
 
     return () => {
       document.removeEventListener("pointerdown", tryPlay);
-      document.removeEventListener("keydown", tryPlay);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       audio.removeEventListener("ended", onEnded);
       audio.pause();
-      audio.src = "";
+      audio.removeAttribute("src");
+      audio.load();
       bgAudio = null;
     };
   }, []);

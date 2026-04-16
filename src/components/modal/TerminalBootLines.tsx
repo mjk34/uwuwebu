@@ -76,6 +76,8 @@ export default function TerminalBootLines({
       done.current = true;
       if (timer !== null) window.clearTimeout(timer);
     };
+    // Omitted deps (lines, charMs, linePauseMs, onDone) are stable constants/callbacks
+    // from the only call site. Effect should only re-run when `instant` changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instant]);
 

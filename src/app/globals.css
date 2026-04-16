@@ -6,7 +6,7 @@
   --bg-elevated: #181a25;
   --fg: #f0f1f5;
   --fg-muted: #b2b7c7;
-  --fg-dim: #747d99;
+  --fg-dim: #858eaa;
   --accent: #00f0ff;
   --accent-dim: #0097a7;
   --accent-deep: #005d6a;
@@ -43,12 +43,6 @@ body {
   color: var(--bg-deep);
 }
 
-@media (pointer: fine) {
-  *, *::before, *::after {
-    cursor: none !important;
-  }
-}
-
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -62,4 +56,24 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+.bg-radial-glow {
+  background: radial-gradient(ellipse 55% 50% at 50% 50%, rgba(25,30,50,0.5) 0%, transparent 65%);
+}
+
+.bg-radial-accent {
+  background: radial-gradient(ellipse 70% 65% at 50% 50%, transparent 60%, rgba(13,14,20,0.45) 100%);
+}
+
+dialog[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+dialog::backdrop {
+  background: rgba(13, 14, 20, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }

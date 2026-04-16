@@ -12,7 +12,7 @@ export type MockUser = {
 
 export const mockUsers: MockUser[] = [
   {
-    discordId: "221368188217065475",
+    discordId: "000000000000000001",
     username: "mjk",
     avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png",
     creds: 12480,
@@ -23,7 +23,7 @@ export const mockUsers: MockUser[] = [
     tickets: 5,
   },
   {
-    discordId: "304010830963376129",
+    discordId: "000000000000000002",
     username: "testfriend",
     avatarUrl: "https://cdn.discordapp.com/embed/avatars/1.png",
     creds: 3210,
@@ -48,6 +48,3 @@ export const mockUsers: MockUser[] = [
 
 export const mockCurrentUser: MockUser = mockUsers[0];
 
-export function getMockUser(discordId: string): MockUser | undefined {
-  return mockUsers.find((u) => u.discordId === discordId);
-}
