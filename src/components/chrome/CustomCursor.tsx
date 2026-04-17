@@ -20,7 +20,7 @@ export default function CustomCursor() {
     const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
     if (isTouchDevice) return;
 
-    document.documentElement.style.cursor = "none";
+    document.documentElement.classList.add("cursor-hidden");
 
     const onMove = (e: MouseEvent) => {
       pos.current.x = e.clientX;
@@ -64,7 +64,7 @@ export default function CustomCursor() {
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
-      document.documentElement.style.cursor = "";
+      document.documentElement.classList.remove("cursor-hidden");
       window.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseleave", onLeave);
       cancelAnimationFrame(rafRef.current);

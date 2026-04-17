@@ -77,3 +77,10 @@ dialog::backdrop {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
+
+html.cursor-hidden,
+html.cursor-hidden *,
+html.cursor-hidden *::before,
+html.cursor-hidden *::after {
+  cursor: none !important;
+}

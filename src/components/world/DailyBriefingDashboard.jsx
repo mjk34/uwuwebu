@@ -427,7 +427,7 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
           const cvs2=document.createElement("canvas");cvs2.width=TW;cvs2.height=TH;
           const ctx2=cvs2.getContext("2d");ctx2.filter="blur(1.5px)";ctx2.drawImage(cvs,0,0);
           const tex=new THREE.CanvasTexture(cvs2);
-          coreMat.map=tex;coreMat.color.set(0xffffff);coreMat.needsUpdate=true;
+          coreMat.map=tex;coreMat.needsUpdate=true;
         },80));
       }).catch(()=>{});
 
