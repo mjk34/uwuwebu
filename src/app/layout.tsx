@@ -43,7 +43,7 @@ export default function RootLayout({
         <TopStrip />
         {children}
         <footer className="relative z-[50] mt-auto border-t border-fg-dim/20 bg-bg-deep px-4 py-2 font-mono text-[8px] uppercase tracking-[0.15em] text-fg-dim sm:px-14 sm:py-3 sm:text-[10px] sm:tracking-[0.3em] lg:px-20">
-          {"// UWUVERSITY / NON-ACCREDITED / 2026"}
+          {"// UWUVERSITY / 2026"}
         </footer>
       </body>
     </html>
