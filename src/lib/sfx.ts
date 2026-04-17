@@ -8,6 +8,7 @@ export type SfxName =
   | "tick"
   | "tick-metallic"
   | "tick-data"
+  | "tick-data-9"
   | "tick-buzz"
   | "cursor-blink";
 
@@ -131,6 +132,20 @@ export function playSfx(name: SfxName): void {
       osc2.connect(g2).connect(masterOut(ac));
       osc2.start(now2);
       osc2.stop(now2 + 0.35);
+      return;
+    }
+    case "tick-data-9": {
+      const now2 = ac.currentTime;
+      const osc2 = ac.createOscillator();
+      const g2 = ac.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(300, now2);
+      osc2.frequency.exponentialRampToValueAtTime(2800, now2 + 0.22);
+      g2.gain.setValueAtTime(0.08, now2);
+      g2.gain.exponentialRampToValueAtTime(0.0001, now2 + 0.28);
+      osc2.connect(g2).connect(masterOut(ac));
+      osc2.start(now2);
+      osc2.stop(now2 + 0.32);
       return;
     }
     case "tick-buzz":

@@ -13,6 +13,7 @@ type DecryptLinkProps = {
   tickMs?: number;
   as?: "link" | "button";
   tickSfx?: SfxName;
+  "aria-disabled"?: boolean;
 };
 
 export default function DecryptLink({
@@ -24,6 +25,7 @@ export default function DecryptLink({
   tickMs = 28,
   as,
   tickSfx = "tick",
+  "aria-disabled": ariaDisabled,
 }: DecryptLinkProps) {
   const { display, scrambleTo, snapTo } = useScramble(label, {
     duration: durationMs,
@@ -38,6 +40,7 @@ export default function DecryptLink({
 
   const common = {
     "aria-label": label,
+    "aria-disabled": ariaDisabled,
     className,
     onMouseEnter: handleEnter,
     onMouseLeave: handleLeave,

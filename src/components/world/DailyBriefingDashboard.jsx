@@ -2,53 +2,24 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import * as THREE from "three";
-import { isSfxMuted, onMuteChange } from "@/lib/sfx";
+import { playSfx } from "@/lib/sfx";
 
-/* ═══════════ SFX ENGINE (Web Audio) ═══════════ */
-let _ctx=null,_master=null,_muted=false;
-// Seed from global SFX module — authoritative in-memory state, independent of localStorage
+/* ═══════════ REDUCED MOTION ═══════════ */
+let _reducedMotion=false;
 if(typeof window!=="undefined"){
-  try{_muted=isSfxMuted();}catch{}
+  try{
+    const mql=window.matchMedia("(prefers-reduced-motion: reduce)");
+    _reducedMotion=mql.matches;
+    mql.addEventListener("change",(e)=>{_reducedMotion=e.matches;});
+  }catch{}
 }
-export function _setMuted(m){
-  _muted=!!m;
-  if(_master)_master.gain.value=_muted?0:1;
-  if(_ctx){
-    if(_muted&&_ctx.state==="running")_ctx.suspend().catch(()=>{});
-    else if(!_muted&&_ctx.state==="suspended")_ctx.resume().catch(()=>{});
-  }
-}
-function getAC(){if(typeof window==="undefined")return null;if(_ctx){if(_ctx.state==="suspended"&&!_muted)_ctx.resume().catch(()=>{});return _ctx;}const C=window.AudioContext||(window).webkitAudioContext;if(!C)return null;try{_ctx=new C();}catch{_ctx=null;}if(!_ctx)return null;_master=_ctx.createGain();_master.gain.value=1;_master.connect(_ctx.destination);return _ctx;}
-function masterOut(ac){return _master||ac.destination;}
-function _isMuted(){try{return _muted||isSfxMuted();}catch{return _muted;}}
-function tone(freq,durMs,type,gain){if(_isMuted())return;const ac=getAC();if(!ac)return;const now=ac.currentTime;const osc=ac.createOscillator();const g=ac.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,now);g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(gain,now+0.004);g.gain.exponentialRampToValueAtTime(0.0001,now+durMs/1000);osc.connect(g).connect(masterOut(ac));osc.start(now);osc.stop(now+durMs/1000+0.02);}
-function noiseBurst(durMs,gain,highpass=1800){if(_isMuted())return;const ac=getAC();if(!ac)return;const now=ac.currentTime;const frames=Math.floor(ac.sampleRate*durMs/1000);const buf=ac.createBuffer(1,frames,ac.sampleRate);const data=buf.getChannelData(0);for(let i=0;i<frames;i++)data[i]=Math.random()*2-1;const src=ac.createBufferSource();src.buffer=buf;const hp=ac.createBiquadFilter();hp.type="highpass";hp.frequency.value=highpass;const g=ac.createGain();g.gain.setValueAtTime(gain,now);g.gain.exponentialRampToValueAtTime(0.0001,now+durMs/1000);src.connect(hp).connect(g).connect(masterOut(ac));src.start(now);src.stop(now+durMs/1000+0.02);}
-function playSfx(name){if(typeof window==="undefined"||_isMuted())return;const ac=getAC();if(!ac)return;switch(name){case"hover":tone(880,60,"triangle",0.05);return;case"click":tone(440,90,"square",0.08);return;case"tick":noiseBurst(22,0.06,2400);tone(1600,28,"square",0.03);return;
-case"tick-data-1":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(3000,n);o.frequency.exponentialRampToValueAtTime(600,n+0.25);g.gain.setValueAtTime(0.1,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.3);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.35);return;}
-case"tick-data-2":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="triangle";o.frequency.setValueAtTime(4400,n);o.frequency.exponentialRampToValueAtTime(2200,n+0.18);g.gain.setValueAtTime(0.11,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.5);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.55);return;}
-case"tick-data-3":{const n=ac.currentTime;const b=ac.createOscillator();const bg=ac.createGain();b.type="sine";b.frequency.setValueAtTime(130,n);b.frequency.exponentialRampToValueAtTime(42,n+0.18);bg.gain.setValueAtTime(0.2,n);bg.gain.exponentialRampToValueAtTime(0.0001,n+0.2);b.connect(bg).connect(masterOut(ac));b.start(n);b.stop(n+0.22);const h=ac.createOscillator();const hg=ac.createGain();h.type="triangle";h.frequency.setValueAtTime(5800,n+0.02);h.frequency.exponentialRampToValueAtTime(2800,n+0.28);hg.gain.setValueAtTime(0.07,n+0.02);hg.gain.exponentialRampToValueAtTime(0.0001,n+0.38);h.connect(hg).connect(masterOut(ac));h.start(n+0.02);h.stop(n+0.42);return;}
-case"tick-data-4":{const n=ac.currentTime;[0,0.11].forEach((d,i)=>{const o=ac.createOscillator();const g=ac.createGain();o.type="square";o.frequency.setValueAtTime(1900-i*420,n+d);g.gain.setValueAtTime(0.055,n+d);g.gain.exponentialRampToValueAtTime(0.0001,n+d+0.09);o.connect(g).connect(masterOut(ac));o.start(n+d);o.stop(n+d+0.11);});return;}
-case"tick-data-5":{const n=ac.currentTime;[900,1350,1800].forEach((f,i)=>{const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(f,n+i*0.07);g.gain.setValueAtTime(0.065,n+i*0.07);g.gain.exponentialRampToValueAtTime(0.0001,n+i*0.07+0.38);o.connect(g).connect(masterOut(ac));o.start(n+i*0.07);o.stop(n+i*0.07+0.42);});return;}
-case"tick-data-6":{noiseBurst(35,0.07,900);const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(380,n+0.03);o.frequency.exponentialRampToValueAtTime(1400,n+0.32);g.gain.setValueAtTime(0,n);g.gain.linearRampToValueAtTime(0.09,n+0.04);g.gain.exponentialRampToValueAtTime(0.0001,n+0.42);o.connect(g).connect(masterOut(ac));o.start(n+0.03);o.stop(n+0.46);return;}
-case"tick-data-7":{const n=ac.currentTime;const o=ac.createOscillator();const f=ac.createBiquadFilter();const g=ac.createGain();o.type="square";o.frequency.value=2600;f.type="bandpass";f.frequency.value=2600;f.Q.value=10;g.gain.setValueAtTime(0.04,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.55);o.connect(f).connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.6);return;}
-case"tick-data-8":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(220,n);o.frequency.exponentialRampToValueAtTime(55,n+0.12);g.gain.setValueAtTime(0.22,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.15);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.18);noiseBurst(18,0.05,1200);return;}
-case"tick-data-9":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(300,n);o.frequency.exponentialRampToValueAtTime(2800,n+0.22);g.gain.setValueAtTime(0.08,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.28);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.32);return;}
-case"tick-data-10":{noiseBurst(9,0.12,3000);return;}
-case"tick-data-11":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sawtooth";o.frequency.setValueAtTime(900,n);o.frequency.exponentialRampToValueAtTime(180,n+0.2);g.gain.setValueAtTime(0.07,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.25);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.3);return;}
-case"tick-data-12":{const n=ac.currentTime;[660,1320].forEach((f,i)=>{const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(f,n);g.gain.setValueAtTime(i===0?0.1:0.04,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.7);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.75);});return;}
-case"tick-data-13":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="square";o.frequency.setValueAtTime(3500,n);g.gain.setValueAtTime(0.05,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.04);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.05);return;}
-case"tick-data-14":{const n=ac.currentTime;const mod=ac.createOscillator();const mGain=ac.createGain();mod.frequency.value=8;mGain.gain.value=120;mod.connect(mGain);const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(1200,n);mGain.connect(o.frequency);g.gain.setValueAtTime(0.09,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.4);o.connect(g).connect(masterOut(ac));mod.start(n);o.start(n);o.stop(n+0.42);mod.stop(n+0.42);return;}
-case"tick-data-15":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(75,n);g.gain.setValueAtTime(0.25,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.9);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.95);return;}
-case"tick-data-16":{const n=ac.currentTime;const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(1100,n);o.frequency.exponentialRampToValueAtTime(4200,n+0.12);g.gain.setValueAtTime(0.09,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.15);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.18);return;}
-case"tick-data-17":{const n=ac.currentTime;[0,0.07,0.14].forEach(d=>{const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.value=2200;g.gain.setValueAtTime(0.06,n+d);g.gain.exponentialRampToValueAtTime(0.0001,n+d+0.05);o.connect(g).connect(masterOut(ac));o.start(n+d);o.stop(n+d+0.06);});return;}
-case"tick-data-18":{const n=ac.currentTime;[440,550,660].forEach((f,i)=>{const o=ac.createOscillator();const g=ac.createGain();o.type="sine";o.frequency.value=f;g.gain.setValueAtTime(0.06,n);g.gain.exponentialRampToValueAtTime(0.0001,n+0.5);o.connect(g).connect(masterOut(ac));o.start(n);o.stop(n+0.55);});return;}}}
 
 /* ═══════════ SCRAMBLE / DECRYPT ═══════════ */
 const GLYPHS="!<>-_\\/[]{}—=+*^?#________";
 function scrambleStep(target,revealed){const n=Math.max(0,Math.min(revealed,target.length));let out=target.slice(0,n);for(let i=n;i<target.length;i++){const ch=target[i];if(ch===" "){out+=" ";continue;}out+=GLYPHS[Math.floor(Math.random()*GLYPHS.length)];}return out;}
 function useScramble(initial,opts={}){const{duration=240,interval=18,sfxEvery=2}=opts;const[display,setDisplay]=useState(initial);const timerRef=useRef(null);const startRef=useRef(null);
 const stop=useCallback(()=>{if(timerRef.current!==null){clearInterval(timerRef.current);timerRef.current=null;}startRef.current=null;},[]);
-const scrambleTo=useCallback((target,callOpts)=>{stop();const baseDur=callOpts?.duration??duration;const dur=Math.round(Math.max(80,baseDur*(6/Math.max(6,target.replace(/\s/g,'').length))));setDisplay(scrambleStep(target,0));startRef.current=performance.now();let tickCount=0;timerRef.current=setInterval(()=>{const elapsed=performance.now()-(startRef.current??0);const progress=Math.min(1,elapsed/dur);const revealed=Math.floor(progress*target.length);setDisplay(scrambleStep(target,revealed));if(progress<1&&tickCount%sfxEvery===0)playSfx("tick");tickCount++;if(progress>=1){stop();setDisplay(target);callOpts?.onDone?.();}},interval);},[stop,duration,interval,sfxEvery]);
+const scrambleTo=useCallback((target,callOpts)=>{stop();if(_reducedMotion){setDisplay(target);callOpts?.onDone?.();return;}const baseDur=callOpts?.duration??duration;const dur=Math.round(Math.max(80,baseDur*(6/Math.max(6,target.replace(/\s/g,'').length))));setDisplay(scrambleStep(target,0));startRef.current=performance.now();let tickCount=0;timerRef.current=setInterval(()=>{const elapsed=performance.now()-(startRef.current??0);const progress=Math.min(1,elapsed/dur);const revealed=Math.floor(progress*target.length);setDisplay(scrambleStep(target,revealed));if(progress<1&&tickCount%sfxEvery===0)playSfx("tick");tickCount++;if(progress>=1){stop();setDisplay(target);callOpts?.onDone?.();}},interval);},[stop,duration,interval,sfxEvery]);
 const snapTo=useCallback((text)=>{stop();setDisplay(text);},[stop]);
 useEffect(()=>()=>{if(timerRef.current!==null)clearInterval(timerRef.current);},[]);
 return{display,scrambleTo,snapTo,stop};}
@@ -61,8 +32,8 @@ useEffect(()=>{const canvas=canvasRef.current;if(!canvas)return;const ctx=canvas
 const resize=()=>{const dpr=window.devicePixelRatio||1;s.w=window.innerWidth;s.h=window.innerHeight;canvas.width=s.w*dpr;canvas.height=s.h*dpr;canvas.style.width=s.w+"px";canvas.style.height=s.h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);const dots=[];for(let x=-PX_GAP;x<s.w+PX_GAP;x+=PX_GAP)for(let y=-PX_GAP;y<s.h+PX_GAP;y+=PX_GAP)dots.push({bx:x,by:y,op:0.4+Math.random()*0.25});s.dots=dots;};
 resize();window.addEventListener("resize",resize);
 const t0=performance.now();let pos=new Float32Array(s.dots.length*3);
-const draw=()=>{const now=performance.now();const elapsed=(now-t0)/1000;ctx.clearRect(0,0,s.w,s.h);const cx=s.w/2,cy=s.h/2;const cycle=elapsed%PX_WAVE_INT;const waveR=cycle*PX_WAVE_SPEED;const maxDist=Math.sqrt(cx*cx+cy*cy);const fade=1-(waveR/(maxDist+PX_WAVE_WIDTH));const{dots}=s;const len=dots.length;if(pos.length<len*3)pos=new Float32Array(len*3);
-for(let i=0;i<len;i++){const d=dots[i];const rx=d.bx-cx,ry=d.by-cy;const dist=Math.sqrt(rx*rx+ry*ry);const wfDist=Math.abs(dist-waveR);let ox=0,oy=0,brighten=0;if(wfDist<PX_WAVE_WIDTH&&dist>1){const intensity=(1-wfDist/PX_WAVE_WIDTH)*fade;const a=Math.atan2(ry,rx);ox=Math.cos(a)*intensity*PX_DISPLACE;oy=Math.sin(a)*intensity*PX_DISPLACE;brighten=intensity*0.5;}const off=i*3;pos[off]=d.bx+ox;pos[off+1]=d.by+oy;pos[off+2]=brighten;}
+const draw=()=>{const now=performance.now();const elapsed=(now-t0)/1000;ctx.clearRect(0,0,s.w,s.h);const cx=s.w/2,cy=s.h/2;const cycle=elapsed%PX_WAVE_INT;const waveR=_reducedMotion?-99999:cycle*PX_WAVE_SPEED;const maxDist=Math.sqrt(cx*cx+cy*cy);const fade=1-(waveR/(maxDist+PX_WAVE_WIDTH));const{dots}=s;const len=dots.length;if(pos.length<len*3)pos=new Float32Array(len*3);
+for(let i=0;i<len;i++){const d=dots[i];const rx=d.bx-cx,ry=d.by-cy;const dist=Math.sqrt(rx*rx+ry*ry);const wfDist=Math.abs(dist-waveR);let ox=0,oy=0,brighten=0;if(!_reducedMotion&&wfDist<PX_WAVE_WIDTH&&dist>1){const intensity=(1-wfDist/PX_WAVE_WIDTH)*fade;const a=Math.atan2(ry,rx);ox=Math.cos(a)*intensity*PX_DISPLACE;oy=Math.sin(a)*intensity*PX_DISPLACE;brighten=intensity*0.5;}const off=i*3;pos[off]=d.bx+ox;pos[off+1]=d.by+oy;pos[off+2]=brighten;}
 // Glow pass
 for(let i=0;i<len;i++){const off=i*3;const brighten=pos[off+2];if(brighten<0.05)continue;const fx=pos[off],fy=pos[off+1];if(fx<-30||fx>s.w+30||fy<-30||fy>s.h+30)continue;const glowR=PX_DOT*(8+brighten*18);const glowOp=Math.min(0.5,brighten*0.6);const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,glowR);grad.addColorStop(0,`rgba(${PX_CYAN[0]},${PX_CYAN[1]},${PX_CYAN[2]},${glowOp})`);grad.addColorStop(0.35,`rgba(${PX_CYAN[0]},${PX_CYAN[1]},${PX_CYAN[2]},${glowOp*0.35})`);grad.addColorStop(1,`rgba(${PX_CYAN[0]},${PX_CYAN[1]},${PX_CYAN[2]},0)`);ctx.beginPath();ctx.arc(fx,fy,glowR,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();}
 // Dot pass
@@ -233,6 +204,11 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
   useEffect(()=>{
     const el=mountRef.current;if(!el)return;const st=S.current;
     const w=el.clientWidth,h=el.clientHeight;
+    // Cancellation plumbing: unmount should abort the atlas fetch, block deferred
+    // builders from touching a disposed scene, and let cleanup dispose THREE resources.
+    let cancelled=false;
+    const initTimeouts=[];
+    const abortCtrl=typeof AbortController!=="undefined"?new AbortController():null;
     const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(36,w/h,0.1,100);camera.position.z=3.5;
     // Preflight WebGL: three.js's WebGLRenderer logs console.error before throwing,
     // which Next.js dev overlay surfaces even when caught. Probe first.
@@ -388,8 +364,9 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
     });
     st.conflictArcs=conflictArcs;
 
-    fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json")
+    fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json",abortCtrl?{signal:abortCtrl.signal}:undefined)
       .then(r=>r.json()).then(topo=>{
+        if(cancelled)return;
         const decoded=decodeTopo(topo);
         // Use 'countries' for mask (properly split at antimeridian)
         const polys=extractPolys(topo,decoded);
@@ -406,7 +383,8 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
         const cg=new THREE.BufferGeometry();cg.setAttribute("position",new THREE.Float32BufferAttribute(cp,3));
         group.add(new THREE.Points(cg,new THREE.PointsMaterial({color:0x00f0ff,size:0.004,sizeAttenuation:true,transparent:true,opacity:0.45})));
         // Land + ocean dots — both built, one visible at a time based on mode
-        setTimeout(()=>{
+        initTimeouts.push(setTimeout(()=>{
+          if(cancelled)return;
           const landData=genDots(120000,mask,false);
           const landGeom=new THREE.BufferGeometry();landGeom.setAttribute("position",new THREE.BufferAttribute(landData,3));
           const landMesh=new THREE.Points(landGeom,new THREE.PointsMaterial({color:0x0097a7,size:0.006,sizeAttenuation:true,transparent:true,opacity:0.55}));
@@ -417,10 +395,11 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
           oceanMesh.visible=mode==="history";
           group.add(landMesh);group.add(oceanMesh);
           st.landDots=landMesh;st.oceanDots=oceanMesh;
-        },30);
+        },30));
 
         // Ocean texture — also using mask
-        setTimeout(()=>{
+        initTimeouts.push(setTimeout(()=>{
+          if(cancelled)return;
           const TW=800,TH=400;
           const cvs=document.createElement("canvas");cvs.width=TW;cvs.height=TH;
           const ctx=cvs.getContext("2d");
@@ -449,7 +428,7 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
           const ctx2=cvs2.getContext("2d");ctx2.filter="blur(1.5px)";ctx2.drawImage(cvs,0,0);
           const tex=new THREE.CanvasTexture(cvs2);
           coreMat.map=tex;coreMat.color.set(0xffffff);coreMat.needsUpdate=true;
-        },80);
+        },80));
       }).catch(()=>{});
 
     /* ── Input ── */
@@ -510,24 +489,26 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
 
     let t=0;const v3=new THREE.Vector3();const PI2=Math.PI*2;
     const animate=()=>{st.frame=requestAnimationFrame(animate);t+=0.016;
-      if(!st._locked&&st.autoRotate&&!st.dragging)st.targetRot.y+=0.0008;
+      if(!_reducedMotion&&!st._locked&&st.autoRotate&&!st.dragging)st.targetRot.y+=0.0008;
       // Normalize rotation to shortest path (prevents accumulation)
       while(st.targetRot.y-st.currentRot.y>Math.PI)st.targetRot.y-=PI2;
       while(st.targetRot.y-st.currentRot.y<-Math.PI)st.targetRot.y+=PI2;
       // Tilt recovery: very slow lerp back to default (paused during drag)
-      const xRate=(st._tiltRecovering&&!st.dragging)?0.002:(st._locked?0.025:0.012);
+      const xRate=_reducedMotion?1:((st._tiltRecovering&&!st.dragging)?0.002:(st._locked?0.025:0.012));
       if(st._tiltRecovering&&!st.dragging){st.targetRot.x=st.defaultX;if(Math.abs(st.currentRot.x-st.defaultX)<0.001)st._tiltRecovering=false;}
       st.currentRot.x+=(st.targetRot.x-st.currentRot.x)*xRate;
-      st.currentRot.y+=(st.targetRot.y-st.currentRot.y)*0.012;
+      st.currentRot.y+=(st.targetRot.y-st.currentRot.y)*(_reducedMotion?1:0.012);
       // Keep values in range
       st.currentRot.y=((st.currentRot.y%PI2)+PI2)%PI2;
       st.targetRot.y=((st.targetRot.y%PI2)+PI2)%PI2;
       group.rotation.x=st.currentRot.x;group.rotation.y=st.currentRot.y;group.updateMatrixWorld();
-      ring1.rotation.x=Math.sin(t*.25)*.4;ring1.rotation.z=Math.cos(t*.2)*.3;
-      ring2.rotation.x=Math.cos(t*.3)*.4+1;ring2.rotation.z=Math.sin(t*.15)*.5;
+      if(!_reducedMotion){
+        ring1.rotation.x=Math.sin(t*.25)*.4;ring1.rotation.z=Math.cos(t*.2)*.3;
+        ring2.rotation.x=Math.cos(t*.3)*.4+1;ring2.rotation.z=Math.sin(t*.15)*.5;
+      }
 
       // Conflict arcs — animate traveling projectiles along bezier curves
-      if(st.conflictArcs){
+      if(!_reducedMotion&&st.conflictArcs){
         st.conflictArcs.forEach(arc=>{
           const phase=((t*0.24+arc.offset)%1);
           const pos=arc.curve.getPoint(phase);
@@ -615,7 +596,33 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
     animate();
     const onR=()=>{const nw=el.clientWidth,nh=el.clientHeight;camera.aspect=nw/nh;camera.updateProjectionMatrix();renderer.setSize(nw,nh);};
     window.addEventListener("resize",onR);
-    return()=>{cancelAnimationFrame(st.frame);el.removeEventListener("mousedown",onD);window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU);el.removeEventListener("touchstart",onTS);window.removeEventListener("touchmove",onTM);window.removeEventListener("touchend",onTE);window.removeEventListener("resize",onR);el.removeEventListener("mousemove",onHover);el.removeEventListener("mouseleave",onLeave);Object.values(labels).forEach(l=>{if(el.contains(l))el.removeChild(l);});capMarkers.forEach(c=>{if(el.contains(c.lbl))el.removeChild(c.lbl);});renderer.dispose();if(el.contains(renderer.domElement))el.removeChild(renderer.domElement);};
+    return()=>{
+      cancelled=true;
+      abortCtrl?.abort();
+      initTimeouts.forEach(clearTimeout);
+      clearTimeout(st._returnTimer);
+      cancelAnimationFrame(st.frame);
+      el.removeEventListener("mousedown",onD);window.removeEventListener("mousemove",onM);window.removeEventListener("mouseup",onU);
+      el.removeEventListener("touchstart",onTS);window.removeEventListener("touchmove",onTM);window.removeEventListener("touchend",onTE);
+      window.removeEventListener("resize",onR);
+      el.removeEventListener("mousemove",onHover);el.removeEventListener("mouseleave",onLeave);
+      Object.values(labels).forEach(l=>{if(el.contains(l))el.removeChild(l);});
+      capMarkers.forEach(c=>{if(el.contains(c.lbl))el.removeChild(c.lbl);});
+      // Walk scene graph and release GPU resources. Without this, every /world
+      // unmount orphans ~120k-point BufferGeometries, ring/arc meshes, and the
+      // ocean CanvasTexture — a leak on each route change.
+      scene.traverse(obj=>{
+        if(obj.geometry)obj.geometry.dispose();
+        const mats=obj.material?(Array.isArray(obj.material)?obj.material:[obj.material]):[];
+        mats.forEach(m=>{
+          for(const k in m){const v=m[k];if(v&&typeof v==="object"&&v.isTexture)v.dispose();}
+          m.dispose();
+        });
+      });
+      scene.clear();
+      renderer.dispose();
+      if(el.contains(renderer.domElement))el.removeChild(renderer.domElement);
+    };
   },[]);
 
   useEffect(()=>{S.current._hoveredId=hoveredId;},[hoveredId]);
@@ -678,12 +685,6 @@ function AppInner(){
     setReadIds(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});
   },[]);
   const barRefs=useRef({});
-
-  // Wire dashboard SFX mute to global SFX module (authoritative, localStorage-free).
-  useEffect(()=>{
-    _setMuted(isSfxMuted());
-    return onMuteChange(_setMuted);
-  },[]);
 
   const lineSourceRef=useRef(null),svgPathRef=useRef(null);
   const lerpRafRef=useRef(null);

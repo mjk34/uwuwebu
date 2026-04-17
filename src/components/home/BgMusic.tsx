@@ -42,9 +42,11 @@ export default function BgMusic() {
       }, () => {});
     };
     document.addEventListener("pointerdown", tryPlay);
+    document.addEventListener("keydown", tryPlay);
 
     return () => {
       document.removeEventListener("pointerdown", tryPlay);
+      document.removeEventListener("keydown", tryPlay);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       audio.removeEventListener("ended", onEnded);
       audio.pause();

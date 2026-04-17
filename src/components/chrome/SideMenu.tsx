@@ -103,6 +103,7 @@ export default function SideMenu() {
                   as={item.disabled ? "button" : undefined}
                   onClick={item.disabled ? undefined : () => menuStore.setOpen(false)}
                   tickSfx={item.sfx}
+                  aria-disabled={item.disabled || undefined}
                   className={
                     item.disabled
                       ? "inline-block cursor-not-allowed text-left text-4xl font-black uppercase tracking-tight text-fg-dim/50 transition-all hover:text-fg-dim/70 focus-visible:text-fg-dim/70 focus-visible:outline-none"
