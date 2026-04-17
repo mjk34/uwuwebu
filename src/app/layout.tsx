@@ -6,6 +6,7 @@ import TopStrip from "@/components/chrome/TopStrip";
 import SideMenuToggle from "@/components/chrome/SideMenuToggle";
 import SideMenu from "@/components/chrome/SideMenu";
 import CustomCursor from "@/components/chrome/CustomCursor";
+import BgMusic from "@/components/home/BgMusic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,13 +34,17 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="relative min-h-full bg-bg-deep text-fg">
+      <body className="relative flex min-h-screen flex-col bg-bg-deep text-fg">
         <CustomCursor />
         <IntroGate />
+        <BgMusic />
         <SideMenuToggle />
         <SideMenu />
         <TopStrip />
         {children}
+        <footer className="relative z-[50] mt-auto border-t border-fg-dim/20 bg-bg-deep px-4 py-2 font-mono text-[8px] uppercase tracking-[0.15em] text-fg-dim sm:px-14 sm:py-3 sm:text-[10px] sm:tracking-[0.3em] lg:px-20">
+          {"// UWUVERSITY / NON-ACCREDITED / 2026"}
+        </footer>
       </body>
     </html>
   );

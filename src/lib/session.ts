@@ -80,6 +80,8 @@ export function isMuted(): boolean {
 export function setMuted(on: boolean): void {
   writeLocal(LocalKeys.muted, on ? "1" : "0");
   if (isBrowser()) {
-    window.dispatchEvent(new CustomEvent("uwuversity:mute-change"));
+    window.dispatchEvent(
+      new CustomEvent("uwuversity:mute-change", { detail: { muted: on } }),
+    );
   }
 }

@@ -148,6 +148,20 @@ export function playSfx(name: SfxName): void {
   }
 }
 
+/** Read current in-memory mute state (authoritative, independent of localStorage). */
+export function isSfxMuted(): boolean {
+  return muted;
+}
+
+const muteListeners = new Set<(muted: boolean) => void>();
+/** Subscribe to mute changes. Returns unsubscribe. */
+export function onMuteChange(cb: (muted: boolean) => void): () => void {
+  muteListeners.add(cb);
+  return () => {
+    muteListeners.delete(cb);
+  };
+}
+
 /** Direct mute sync — call with current mute state for immediate effect. */
 export function syncMuteState(isMuted: boolean): void {
   muted = isMuted;
@@ -156,4 +170,5 @@ export function syncMuteState(isMuted: boolean): void {
     if (muted) void ctx.suspend();
     else void ctx.resume();
   }
+  muteListeners.forEach((cb) => cb(muted));
 }

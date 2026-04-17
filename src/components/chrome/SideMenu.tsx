@@ -8,14 +8,21 @@ import { clearLocal, hasMockSession, LocalKeys } from "@/lib/session";
 import { useSubscribedValue } from "@/lib/client-values";
 import type { SfxName } from "@/lib/sfx";
 
-type NavItem = { label: string; href: string; desc: string; sfx: SfxName };
+type NavItem = {
+  label: string;
+  href: string;
+  desc: string;
+  sfx: SfxName;
+  disabled?: boolean;
+};
 type SocialItem = { label: string; href: string };
 
 const NAV: NavItem[] = [
   { label: "H.O.M.E.", href: "/", desc: "Main terminal — uplink status & demo reel", sfx: "tick" },
-  { label: "L.E.A.R.N.", href: "/learn", desc: "Leveled Education & Achievement Ranking Network", sfx: "tick" },
-  { label: "E.V.E.N.T.S.", href: "/events", desc: "Scheduled drops, raids & community ops", sfx: "tick" },
-  { label: "C.L.I.P.S.", href: "/clip-night", desc: "Peer-reviewed highlight reels & best-of archive", sfx: "tick" },
+  { label: "W.O.R.L.D.", href: "/world", desc: "News dashboard", sfx: "tick" },
+  { label: "L.E.A.R.N.", href: "/learn", desc: "Leveled Education & Achievement Ranking Network", sfx: "tick", disabled: true },
+  { label: "E.V.E.N.T.S.", href: "/events", desc: "Scheduled drops, raids & community ops", sfx: "tick", disabled: true },
+  { label: "C.L.I.P.S.", href: "/clip-night", desc: "Peer-reviewed highlight reels & best-of archive", sfx: "tick", disabled: true },
 ];
 
 const SOCIALS: SocialItem[] = [
@@ -89,14 +96,30 @@ export default function SideMenu() {
         <nav className="flex flex-col gap-5">
           {NAV.map((item) => (
             <div key={item.href} className="flex flex-col gap-0.5">
-              <DecryptLink
-                label={item.label}
-                href={item.href}
-                onClick={() => menuStore.setOpen(false)}
-                tickSfx={item.sfx}
-                className="inline-block text-left text-4xl font-black uppercase tracking-tight text-fg transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
-              />
-              <span className="pl-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-dim">
+              <div className="flex items-baseline gap-3">
+                <DecryptLink
+                  label={item.label}
+                  href={item.disabled ? undefined : item.href}
+                  as={item.disabled ? "button" : undefined}
+                  onClick={item.disabled ? undefined : () => menuStore.setOpen(false)}
+                  tickSfx={item.sfx}
+                  className={
+                    item.disabled
+                      ? "inline-block cursor-not-allowed text-left text-4xl font-black uppercase tracking-tight text-fg-dim/50 transition-all hover:text-fg-dim/70 focus-visible:text-fg-dim/70 focus-visible:outline-none"
+                      : "inline-block text-left text-4xl font-black uppercase tracking-tight text-fg transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
+                  }
+                />
+                {item.disabled && (
+                  <span className="font-mono text-[10px] tracking-[0.2em] text-fg-dim/70">
+                    [SOON]
+                  </span>
+                )}
+              </div>
+              <span
+                className={`pl-0.5 font-mono text-[10px] uppercase tracking-[0.2em] ${
+                  item.disabled ? "text-fg-dim/60" : "text-fg-dim"
+                }`}
+              >
                 {item.desc}
               </span>
             </div>
