@@ -13,10 +13,10 @@ type UseScrambleOpts = {
 
 export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
   const {
-    duration: defaultDuration = 500,
-    interval = 30,
+    duration: defaultDuration = 240,
+    interval = 18,
     sfx = "tick",
-    sfxEvery = 1,
+    sfxEvery = 2,
   } = opts;
 
   const [display, setDisplay] = useState(initial);
@@ -34,7 +34,12 @@ export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
   const scrambleTo = useCallback(
     (target: string, callOpts?: { onDone?: () => void; duration?: number }) => {
       stop();
-      const dur = callOpts?.duration ?? defaultDuration;
+      const baseDur = callOpts?.duration ?? defaultDuration;
+      // Scale down for longer strings so animation doesn't drag; floor 80ms.
+      const nonSpaceLen = target.replace(/\s/g, "").length;
+      const dur = Math.round(
+        Math.max(80, baseDur * (6 / Math.max(6, nonSpaceLen))),
+      );
       const reduced = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;

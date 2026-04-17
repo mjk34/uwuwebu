@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { playSfx } from "@/lib/sfx";
+import { useScramble } from "@/hooks/useScramble";
 
 /* ═══════════ REDUCED MOTION ═══════════ */
 let _reducedMotion=false;
@@ -13,16 +14,6 @@ if(typeof window!=="undefined"){
     mql.addEventListener("change",(e)=>{_reducedMotion=e.matches;});
   }catch{}
 }
-
-/* ═══════════ SCRAMBLE / DECRYPT ═══════════ */
-const GLYPHS="!<>-_\\/[]{}—=+*^?#________";
-function scrambleStep(target,revealed){const n=Math.max(0,Math.min(revealed,target.length));let out=target.slice(0,n);for(let i=n;i<target.length;i++){const ch=target[i];if(ch===" "){out+=" ";continue;}out+=GLYPHS[Math.floor(Math.random()*GLYPHS.length)];}return out;}
-function useScramble(initial,opts={}){const{duration=240,interval=18,sfxEvery=2}=opts;const[display,setDisplay]=useState(initial);const timerRef=useRef(null);const startRef=useRef(null);
-const stop=useCallback(()=>{if(timerRef.current!==null){clearInterval(timerRef.current);timerRef.current=null;}startRef.current=null;},[]);
-const scrambleTo=useCallback((target,callOpts)=>{stop();if(_reducedMotion){setDisplay(target);callOpts?.onDone?.();return;}const baseDur=callOpts?.duration??duration;const dur=Math.round(Math.max(80,baseDur*(6/Math.max(6,target.replace(/\s/g,'').length))));setDisplay(scrambleStep(target,0));startRef.current=performance.now();let tickCount=0;timerRef.current=setInterval(()=>{const elapsed=performance.now()-(startRef.current??0);const progress=Math.min(1,elapsed/dur);const revealed=Math.floor(progress*target.length);setDisplay(scrambleStep(target,revealed));if(progress<1&&tickCount%sfxEvery===0)playSfx("tick");tickCount++;if(progress>=1){stop();setDisplay(target);callOpts?.onDone?.();}},interval);},[stop,duration,interval,sfxEvery]);
-const snapTo=useCallback((text)=>{stop();setDisplay(text);},[stop]);
-useEffect(()=>()=>{if(timerRef.current!==null)clearInterval(timerRef.current);},[]);
-return{display,scrambleTo,snapTo,stop};}
 
 /* ═══════════ PARALLAX DOTS BACKGROUND ═══════════ */
 const PX_RED=[255,42,109],PX_CYAN=[0,240,255];
