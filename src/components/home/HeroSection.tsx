@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useScramble } from "@/hooks/useScramble";
 import { menuStore } from "@/lib/menu-store";
 
@@ -19,11 +19,22 @@ const GLITCH_IDLE_MAX = 12000;
 const GLITCH_HOLD = 1000;
 
 export default function HeroSection() {
-  const { display, scrambleTo, stop: stopScramble } = useScramble(DEFAULT_TEXT);
+  const { display, scrambleTo, snapTo, stop: stopScramble } = useScramble(DEFAULT_TEXT, {
+    duration: 400,
+    interval: 30,
+    sfxEvery: 1,
+    scaleByLength: false,
+  });
+  const menuOpen = useSyncExternalStore(
+    menuStore.subscribe,
+    menuStore.getOpen,
+    menuStore.getServerOpen,
+  );
   const [hovered, setHovered] = useState(false);
   const glitchRef = useRef<number | null>(null);
   const glitchPhaseRef = useRef<number | null>(null);
   const scheduleGlitchRef = useRef<(() => void) | null>(null);
+  const enterTimerRef = useRef<number | null>(null);
 
   const stopGlitch = useCallback(() => {
     if (glitchRef.current !== null) {
@@ -68,25 +79,55 @@ export default function HeroSection() {
     return () => {
       stopScramble();
       stopGlitch();
+      if (enterTimerRef.current !== null) {
+        window.clearTimeout(enterTimerRef.current);
+        enterTimerRef.current = null;
+      }
     };
   }, [stopScramble, stopGlitch]);
 
   useEffect(() => {
+    // While the side menu is open, snap the hero back to the default text and
+    // pause the idle glitch rotation — otherwise a scramble fired moments
+    // before the click stays mid-flight behind the backdrop.
+    if (menuOpen) {
+      stopGlitch();
+      stopScramble();
+      if (enterTimerRef.current !== null) {
+        window.clearTimeout(enterTimerRef.current);
+        enterTimerRef.current = null;
+      }
+      setHovered(false);
+      snapTo(DEFAULT_TEXT);
+      return;
+    }
     if (!hovered) {
       scheduleGlitch();
     }
     return () => stopGlitch();
-  }, [hovered, scheduleGlitch, stopGlitch]);
+  }, [menuOpen, hovered, scheduleGlitch, stopGlitch, stopScramble, snapTo]);
 
   const handleEnter = () => {
     if (hovered) return;
-    if (menuStore.getOpen()) return;
-    stopGlitch();
-    setHovered(true);
-    scrambleTo(HOVER_TEXT);
+    if (menuOpen) return;
+    if (enterTimerRef.current !== null) return;
+    // Dwell delay: quick pass-throughs (mouse crossing the h1 on the way to
+    // the hamburger) shouldn't trigger the reveal scramble. Only intentional
+    // hovers >150ms commit.
+    enterTimerRef.current = window.setTimeout(() => {
+      enterTimerRef.current = null;
+      stopGlitch();
+      setHovered(true);
+      scrambleTo(HOVER_TEXT);
+    }, 150);
   };
 
   const handleLeave = () => {
+    if (enterTimerRef.current !== null) {
+      window.clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+      return;
+    }
     setHovered(false);
     scrambleTo(DEFAULT_TEXT);
   };

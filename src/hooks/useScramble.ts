@@ -9,6 +9,8 @@ type UseScrambleOpts = {
   interval?: number;
   sfx?: SfxName;
   sfxEvery?: number;
+  /** When false, disables the inverse length-scaling so duration is literal. */
+  scaleByLength?: boolean;
 };
 
 export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
@@ -17,6 +19,7 @@ export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
     interval = 18,
     sfx = "tick",
     sfxEvery = 2,
+    scaleByLength = true,
   } = opts;
 
   const [display, setDisplay] = useState(initial);
@@ -35,11 +38,16 @@ export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
     (target: string, callOpts?: { onDone?: () => void; duration?: number }) => {
       stop();
       const baseDur = callOpts?.duration ?? defaultDuration;
-      // Scale down for longer strings so animation doesn't drag; floor 80ms.
-      const nonSpaceLen = target.replace(/\s/g, "").length;
-      const dur = Math.round(
-        Math.max(80, baseDur * (6 / Math.max(6, nonSpaceLen))),
-      );
+      let dur: number;
+      if (scaleByLength) {
+        // Compress total animation into a [200, 300]ms window regardless of
+        // target length: short strings get the top end, long strings floor at 200.
+        const nonSpaceLen = target.replace(/\s/g, "").length;
+        const scaled = baseDur * (6 / Math.max(6, nonSpaceLen));
+        dur = Math.round(Math.max(200, Math.min(300, scaled)));
+      } else {
+        dur = baseDur;
+      }
       const reduced = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
@@ -65,7 +73,7 @@ export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
         }
       }, interval);
     },
-    [stop, defaultDuration, interval, sfx, sfxEvery],
+    [stop, defaultDuration, interval, sfx, sfxEvery, scaleByLength],
   );
 
   const snapTo = useCallback(

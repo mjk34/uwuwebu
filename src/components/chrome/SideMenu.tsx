@@ -52,11 +52,12 @@ export default function SideMenu() {
     };
     window.addEventListener("keydown", onKey);
     const prev = document.activeElement as HTMLElement | null;
+    // Focus the panel itself rather than the first interactive item.
+    // DecryptLink scrambles its label on focus, so auto-focusing a nav item
+    // would visibly trigger the decryption animation just from opening
+    // the menu. Keyboard users can still Tab from the panel into the items.
     const t = window.setTimeout(() => {
-      const first = panelRef.current?.querySelector<HTMLElement>(
-        'a, button, [tabindex="0"]',
-      );
-      first?.focus();
+      panelRef.current?.focus();
     }, 40);
     return () => {
       window.removeEventListener("keydown", onKey);
@@ -83,6 +84,7 @@ export default function SideMenu() {
       <aside
         id="uwuversity-side-menu"
         ref={panelRef}
+        tabIndex={-1}
         aria-hidden={!open}
         inert={!open || undefined}
         aria-label="Primary navigation"
