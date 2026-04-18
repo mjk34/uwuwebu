@@ -682,10 +682,8 @@ function AppInner(){
     const t=setTimeout(()=>setHoverDelayed(false),200);
     return ()=>clearTimeout(t);
   },[mode]);
-  const{display:liveDisplay,scrambleTo:scrambleLive}=useScramble("LIVE",{duration:240,interval:18});
-  const{display:histDisplay,scrambleTo:scrambleHist}=useScramble("HISTORY",{duration:240,interval:18});
-  useEffect(()=>{if(liveHover&&mode==="live"&&!hoverDelayed&&!scrambleSuppressed)scrambleLive("LIVE");},[liveHover,mode,hoverDelayed,scrambleSuppressed,scrambleLive]);
-  useEffect(()=>{if(historyHover&&mode==="history"&&!hoverDelayed&&!scrambleSuppressed)scrambleHist("HISTORY");},[historyHover,mode,hoverDelayed,scrambleSuppressed,scrambleHist]);
+  const{display:liveDisplay,scrambleTo:scrambleLive,snapTo:snapLive}=useScramble("LIVE",{duration:240,interval:18});
+  const{display:histDisplay,scrambleTo:scrambleHist,snapTo:snapHist}=useScramble("HISTORY",{duration:240,interval:18});
   const [bookmarkedIds,setBookmarkedIds]=useState(()=>new Set());
   const [readIds,setReadIds]=useState(()=>new Set());
   const toggleBookmark=useCallback(id=>{
@@ -706,6 +704,22 @@ function AppInner(){
     if(mode==="live")return NEWS.filter(n=>!readIds.has(n.id)&&!isOld(n));
     return NEWS.filter(n=>readIds.has(n.id)||isOld(n));
   },[mode,readIds]);
+
+  // Totals for both sides — shown via decryption scramble on hover of the
+  // active side's label. Inactive side stays static, so we can't derive from
+  // baseFeed alone.
+  const liveCount=useMemo(()=>NEWS.filter(n=>!readIds.has(n.id)&&(NOW-n.dateTs)<=WEEK).length,[readIds]);
+  const historyCount=useMemo(()=>NEWS.filter(n=>readIds.has(n.id)||(NOW-n.dateTs)>WEEK).length,[readIds]);
+
+  // Snap both displays back to labels whenever the active mode changes, so a
+  // stale count from a prior hover doesn't linger on the newly-active side.
+  const prevModeRef=useRef(mode);
+  useEffect(()=>{
+    if(prevModeRef.current===mode)return;
+    prevModeRef.current=mode;
+    snapLive("LIVE");
+    snapHist("HISTORY");
+  },[mode,snapLive,snapHist]);
 
   // If the active item isn't in the current feed, auto-select first of feed
   useEffect(()=>{
@@ -972,14 +986,24 @@ function AppInner(){
             transition:"border-color 0.35s ease",
           }}/>
         </div>
-        {/* LIVE side: pulsing dot + LIVE scramble when live; history count when history-active */}
+        {/* LIVE side: green dot + LIVE label always. When live is active,
+            hovering scrambles the label to the live article count. When
+            history is active, the side renders dull/disabled. */}
         <div
-          onMouseEnter={()=>setLiveHover(true)}
-          onMouseLeave={()=>{setLiveHover(false);if(mode==="live")setScrambleSuppressed(false);}}
+          onMouseEnter={()=>{
+            setLiveHover(true);
+            if(mode==="live"&&!hoverDelayed&&!scrambleSuppressed) scrambleLive(String(liveCount));
+          }}
+          onMouseLeave={()=>{
+            setLiveHover(false);
+            if(mode!=="live")return;
+            if(!hoverDelayed&&!scrambleSuppressed) scrambleLive("LIVE");
+            setScrambleSuppressed(false);
+          }}
           style={{
             position:"relative",flex:1,minWidth:145,
             padding:"11px 30px",
-            color:mode==="live"?"#00f0ff":"#ff2a6d",
+            color:mode==="live"?"#00f0ff":"#4a5164",
             transition:"color 0.35s ease",
             display:"flex",alignItems:"center",justifyContent:"center",gap:9,
           }}
@@ -991,26 +1015,33 @@ function AppInner(){
             background:(liveHover&&mode==="live"&&!hoverDelayed)?"radial-gradient(ellipse at center, rgba(0,240,255,0.12) 0%, transparent 70%)":"transparent",
             transition:"box-shadow 0.25s ease, background 0.25s ease",
           }}/>
-          {mode==="live"?(<>
-            <span style={{
-              width:8,height:8,borderRadius:"50%",
-              background:"#05ffa1",
-              boxShadow:"0 0 10px #05ffa1, 0 0 4px #05ffa1",
-              animation:"glowPulse 1.6s ease-in-out infinite",
-            }}/>
-            <span style={{position:"relative"}}>{liveDisplay}</span>
-          </>):(
-            <span style={{position:"relative",fontVariantNumeric:"tabular-nums"}}>{baseFeed.length}</span>
-          )}
+          <span style={{
+            width:8,height:8,borderRadius:"50%",
+            background:mode==="live"?"#05ffa1":"#1f2b28",
+            boxShadow:mode==="live"?"0 0 10px #05ffa1, 0 0 4px #05ffa1":"none",
+            animation:mode==="live"?"glowPulse 1.6s ease-in-out infinite":"none",
+            transition:"background 0.35s ease",
+          }}/>
+          <span style={{position:"relative",fontVariantNumeric:"tabular-nums"}}>{mode==="live"?liveDisplay:"LIVE"}</span>
         </div>
-        {/* HISTORY side: HISTORY scramble when history-active; live count when live-active */}
+        {/* HISTORY side: HISTORY label always. When history is active,
+            hovering scrambles the label to the history article count.
+            When live is active, the side renders dull/disabled. */}
         <div
-          onMouseEnter={()=>setHistoryHover(true)}
-          onMouseLeave={()=>{setHistoryHover(false);if(mode==="history")setScrambleSuppressed(false);}}
+          onMouseEnter={()=>{
+            setHistoryHover(true);
+            if(mode==="history"&&!hoverDelayed&&!scrambleSuppressed) scrambleHist(String(historyCount));
+          }}
+          onMouseLeave={()=>{
+            setHistoryHover(false);
+            if(mode!=="history")return;
+            if(!hoverDelayed&&!scrambleSuppressed) scrambleHist("HISTORY");
+            setScrambleSuppressed(false);
+          }}
           style={{
             position:"relative",flex:1,minWidth:145,
             padding:"11px 30px",
-            color:mode==="history"?"#f0f1f5":"#00f0ff",
+            color:mode==="history"?"#f0f1f5":"#4a5164",
             transition:"color 0.35s ease",
             display:"flex",alignItems:"center",justifyContent:"center",
           }}
@@ -1022,11 +1053,7 @@ function AppInner(){
             background:(historyHover&&mode==="history"&&!hoverDelayed)?"radial-gradient(ellipse at center, rgba(255,42,109,0.12) 0%, transparent 70%)":"transparent",
             transition:"box-shadow 0.25s ease, background 0.25s ease",
           }}/>
-          {mode==="history"?(
-            <span style={{position:"relative"}}>{histDisplay}</span>
-          ):(
-            <span style={{position:"relative",fontVariantNumeric:"tabular-nums"}}>{baseFeed.length}</span>
-          )}
+          <span style={{position:"relative",fontVariantNumeric:"tabular-nums"}}>{mode==="history"?histDisplay:"HISTORY"}</span>
         </div>
       </div>
 
