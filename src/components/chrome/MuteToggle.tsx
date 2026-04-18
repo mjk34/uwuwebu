@@ -30,7 +30,7 @@ export default function MuteToggle() {
       aria-pressed={!muted}
       aria-label={muted ? "Unmute sound effects" : "Mute sound effects"}
       onClick={toggle}
-      className={`flex h-11 w-11 items-center justify-center rounded border bg-bg-deep/70 transition-all focus-visible:outline-none focus-visible:ring-2 ${
+      className={`flex h-[22px] w-[22px] items-center justify-center rounded border bg-bg-deep/70 transition-all focus-visible:outline-none focus-visible:ring-2 md:h-11 md:w-11 ${
         muted
           ? "border-danger/50 text-danger hover:border-danger hover:shadow-[0_0_12px_rgba(255,42,109,0.35)]"
           : "border-accent/40 text-accent hover:border-accent/70 hover:shadow-[0_0_12px_rgba(0,240,255,0.3)]"
@@ -39,7 +39,7 @@ export default function MuteToggle() {
       <svg
         viewBox="0 0 24 24"
         aria-hidden="true"
-        className="h-4 w-4"
+        className="h-2 w-2 md:h-4 md:w-4"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"

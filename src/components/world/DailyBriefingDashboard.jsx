@@ -794,17 +794,31 @@ function AppInner(){
     if(firstInCat&&firstInCat.id!==activeId)setActiveId(firstInCat.id);
   },[activeTags]);
 
+  // Mobile: drop the globe + connection line, center the feed & headline.
+  const isMobile=viewW<1550;
+
+  // Card is locked to 564×275 on desktop. On narrow viewports (< ~624px)
+  // the card shrinks proportionally to fit the viewport minus tight gutters,
+  // and geometry constants (spacing, offsets, svg viewBox) scale with it.
+  const DESKTOP_CARD_W=564;
+  const DESKTOP_CARD_H=275;
+  const cardLeftOffset=isMobile?12:40;
+  const cardRightMargin=isMobile?12:20;
+  const cardW=isMobile
+    ?Math.min(DESKTOP_CARD_W,viewW-cardLeftOffset-cardRightMargin)
+    :DESKTOP_CARD_W;
+  const cardScale=cardW/DESKTOP_CARD_W;
+  const cardH=Math.round(DESKTOP_CARD_H*cardScale);
+
   // Responsive position constants derived from live viewport height
   const MIDDLE_Y=Math.round(viewH*0.40);
-  const ITEM_SPACING=175;
-  const ACTIVE_EXTRA_BOTTOM=109;
+  const ITEM_SPACING=Math.round(175*cardScale);
+  const ACTIVE_EXTRA_BOTTOM=Math.round(109*cardScale);
 
   // Responsive layout — cap gap between feed right-edge and globe left-edge at 60px
   const MAX_GAP=60;
-  const feedWidth=624; // 564px card + 40px left offset + 20px right margin
+  const feedWidth=cardW+cardLeftOffset+cardRightMargin;
   const globeWidth=viewW*0.55;
-  // Mobile: drop the globe + connection line, center the feed & headline.
-  const isMobile=viewW<768;
   const naturalFeedLeft=viewW*0.05;
   const naturalGlobeLeft=viewW*(1-0.02-0.55); // right:2vw, width:55vw
   const naturalGap=naturalGlobeLeft-(naturalFeedLeft+feedWidth);
@@ -889,15 +903,13 @@ function AppInner(){
     if(targetId!=null){playSfx("tick-data-9");setActiveTags([]);setActiveId(targetId);}
   },[expandedId,baseFeed]);
 
-  // Wheel scroll through items (cyclic within filtered feed)
+  // Wheel / touch-swipe scroll through items (cyclic within filtered feed)
   useEffect(()=>{
     const el=document.getElementById("feed-carousel");if(!el)return;
     let lock=false;
-    const onWheel=e=>{
-      e.preventDefault();
+    const advance=dir=>{
       if(lock)return;
       lock=true;setTimeout(()=>{lock=false;},250);
-      const dir=e.deltaY>0?1:-1;
       setHoveredId(null);playSfx("tick");
       setActiveId(curId=>{
         const fn=filteredNewsRef.current;
@@ -912,8 +924,48 @@ function AppInner(){
         return nextItem.id;
       });
     };
+    const onWheel=e=>{e.preventDefault();advance(e.deltaY>0?1:-1);};
+
+    // Touch swipe: vertical gesture advances one item per swipe (threshold
+    // 40px). Below 8px of movement we let the event fall through as a tap so
+    // onClick still fires on cards. preventDefault on sustained vertical
+    // movement so the page doesn't scroll while we're consuming the swipe.
+    const SWIPE_THRESHOLD=40;
+    const LOCK_MOVE=8;
+    let touchStartY=null;
+    const onTouchStart=e=>{
+      if(e.touches.length!==1){touchStartY=null;return;}
+      touchStartY=e.touches[0].clientY;
+    };
+    const onTouchMove=e=>{
+      if(touchStartY==null)return;
+      const dy=e.touches[0].clientY-touchStartY;
+      if(Math.abs(dy)>LOCK_MOVE)e.preventDefault();
+    };
+    const onTouchEnd=e=>{
+      if(touchStartY==null)return;
+      const t=e.changedTouches&&e.changedTouches[0];
+      const endY=t?t.clientY:null;
+      const startY=touchStartY;
+      touchStartY=null;
+      if(endY==null)return;
+      const dy=endY-startY;
+      if(Math.abs(dy)<SWIPE_THRESHOLD)return;
+      // Swipe up (dy<0) advances forward, swipe down reverses — matches wheel.
+      advance(dy<0?1:-1);
+    };
     el.addEventListener("wheel",onWheel,{passive:false});
-    return()=>el.removeEventListener("wheel",onWheel);
+    el.addEventListener("touchstart",onTouchStart,{passive:true});
+    el.addEventListener("touchmove",onTouchMove,{passive:false});
+    el.addEventListener("touchend",onTouchEnd);
+    el.addEventListener("touchcancel",onTouchEnd);
+    return()=>{
+      el.removeEventListener("wheel",onWheel);
+      el.removeEventListener("touchstart",onTouchStart);
+      el.removeEventListener("touchmove",onTouchMove);
+      el.removeEventListener("touchend",onTouchEnd);
+      el.removeEventListener("touchcancel",onTouchEnd);
+    };
   },[]);
 
   return(<>
@@ -949,20 +1001,20 @@ function AppInner(){
           display:"flex",alignItems:"center",
           background:"rgba(10,11,18,0.82)",
           border:`1px solid ${mode==="live"?"#00f0ff66":"#ff2a6d66"}`,
-          borderRadius:999,padding:5,
+          borderRadius:999,padding:isMobile?2.5:5,
           backdropFilter:"blur(8px)",
           WebkitBackdropFilter:"blur(8px)",
           fontFamily:"'JetBrains Mono',monospace",
-          fontSize:15,fontWeight:700,letterSpacing:2.4,
+          fontSize:isMobile?7.5:15,fontWeight:700,letterSpacing:isMobile?1.2:2.4,
           boxShadow:`0 4px 20px rgba(0,0,0,0.3), 0 0 18px ${mode==="live"?"rgba(0,240,255,0.15)":"rgba(255,42,109,0.15)"}`,
           transition:"border-color 0.35s ease, box-shadow 0.35s ease",
         }}
       >
         {/* sliding thumb with layered glass effect */}
         <div style={{
-          position:"absolute",top:5,bottom:5,
-          left:mode==="live"?5:"50%",
-          width:"calc(50% - 5px)",
+          position:"absolute",top:isMobile?2.5:5,bottom:isMobile?2.5:5,
+          left:mode==="live"?(isMobile?2.5:5):"50%",
+          width:`calc(50% - ${isMobile?2.5:5}px)`,
           borderRadius:999,
           overflow:"hidden",
           transition:"left 0.35s cubic-bezier(.4,0,.2,1)",
@@ -1011,11 +1063,11 @@ function AppInner(){
             setScrambleSuppressed(false);
           }}
           style={{
-            position:"relative",width:170,flex:"none",
-            padding:"11px 20px",
+            position:"relative",width:isMobile?85:170,flex:"none",
+            padding:isMobile?"5.5px 10px":"11px 20px",
             color:mode==="live"?"#00f0ff":"#4a5164",
             transition:"color 0.35s ease",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:9,
+            display:"flex",alignItems:"center",justifyContent:"center",gap:isMobile?4.5:9,
             overflow:"hidden",
           }}
         >
@@ -1027,7 +1079,7 @@ function AppInner(){
             transition:"box-shadow 0.25s ease, background 0.25s ease",
           }}/>
           <span style={{
-            width:8,height:8,borderRadius:"50%",flex:"none",
+            width:isMobile?4:8,height:isMobile?4:8,borderRadius:"50%",flex:"none",
             background:mode==="live"?"#05ffa1":"#1f2b28",
             boxShadow:mode==="live"?"0 0 10px #05ffa1, 0 0 4px #05ffa1":"none",
             animation:mode==="live"?"glowPulse 1.6s ease-in-out infinite":"none",
@@ -1053,11 +1105,11 @@ function AppInner(){
             setScrambleSuppressed(false);
           }}
           style={{
-            position:"relative",width:170,flex:"none",
-            padding:"11px 20px",
+            position:"relative",width:isMobile?85:170,flex:"none",
+            padding:isMobile?"5.5px 10px":"11px 20px",
             color:mode==="history"?"#f0f1f5":"#4a5164",
             transition:"color 0.35s ease",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:9,
+            display:"flex",alignItems:"center",justifyContent:"center",gap:isMobile?4.5:9,
             overflow:"hidden",
           }}
         >
@@ -1070,7 +1122,7 @@ function AppInner(){
           }}/>
           {/* Invisible spacer matching the LIVE dot, so HISTORY text sits at
               the same visual offset inside its half. */}
-          <span aria-hidden="true" style={{width:8,height:8,visibility:"hidden",flex:"none"}}/>
+          <span aria-hidden="true" style={{width:isMobile?4:8,height:isMobile?4:8,visibility:"hidden",flex:"none"}}/>
           <span style={{
             position:"relative",fontVariantNumeric:"tabular-nums",
             display:"inline-block",textAlign:"center",
@@ -1080,7 +1132,7 @@ function AppInner(){
 
       {/* ── FILTER BAR ── */}
       <div style={{
-        position:"absolute",left:feedLeft+40,width:feedWidth-60,
+        position:"absolute",left:feedLeft+cardLeftOffset,width:cardW,
         bottom:52,zIndex:15,pointerEvents:"auto",
         display:"flex",flexDirection:"column",gap:6,
         minHeight:50,justifyContent:"flex-start",
@@ -1162,7 +1214,7 @@ function AppInner(){
                 }
               }):undefined}
               style={{
-                position:"absolute",top:y,left:40,width:564,height:275,
+                position:"absolute",top:y,left:cardLeftOffset,width:cardW,height:cardH,
                 transform:`scale(${scl})`,transformOrigin:"left center",
                 transition:"top 380ms cubic-bezier(0.22,1,0.36,1),transform 380ms cubic-bezier(0.22,1,0.36,1),opacity 300ms,border-left-color 250ms,background 250ms",
                 opacity:op,zIndex:isActive?20:10-absOff,cursor:"pointer",

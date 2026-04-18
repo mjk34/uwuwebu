@@ -52,11 +52,11 @@ export default function SignInPill() {
         onMouseLeave={handleLeave}
         onFocus={handleEnter}
         onBlur={handleLeave}
-        className="flex h-9 items-center gap-2 rounded-full border border-fg/80 bg-fg px-5 text-xs font-bold uppercase tracking-[0.2em] text-bg-deep transition-colors hover:border-accent hover:bg-accent hover:text-bg-deep hover:shadow-[0_0_16px_rgba(0,240,255,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex h-[18px] items-center gap-1 rounded-full border border-fg/80 bg-fg px-2.5 text-[6px] font-bold uppercase tracking-[0.2em] text-bg-deep transition-colors hover:border-accent hover:bg-accent hover:text-bg-deep hover:shadow-[0_0_16px_rgba(0,240,255,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent md:h-9 md:gap-2 md:px-5 md:text-xs"
       >
         <span
           aria-hidden="true"
-          className={`h-1.5 w-1.5 rounded-full ${
+          className={`h-[3px] w-[3px] rounded-full md:h-1.5 md:w-1.5 ${
             active ? "bg-ok" : "bg-bg-deep/60"
           }`}
         />
