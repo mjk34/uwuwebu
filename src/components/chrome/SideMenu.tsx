@@ -15,7 +15,6 @@ type NavItem = {
   sfx: SfxName;
   disabled?: boolean;
 };
-type SocialItem = { label: string; href: string };
 
 const NAV: NavItem[] = [
   { label: "H.O.M.E.", href: "/", desc: "Main terminal — uplink status & demo reel", sfx: "tick" },
@@ -23,11 +22,6 @@ const NAV: NavItem[] = [
   { label: "L.E.A.R.N.", href: "/learn", desc: "Leveled Education & Achievement Ranking Network", sfx: "tick", disabled: true },
   { label: "E.V.E.N.T.S.", href: "/events", desc: "Scheduled drops, raids & community ops", sfx: "tick", disabled: true },
   { label: "C.L.I.P.S.", href: "/clip-night", desc: "Peer-reviewed highlight reels & best-of archive", sfx: "tick", disabled: true },
-];
-
-const SOCIALS: SocialItem[] = [
-  { label: "DISCORD", href: "#discord" },
-  { label: "GITHUB", href: "#github" },
 ];
 
 export default function SideMenu() {
@@ -129,23 +123,7 @@ export default function SideMenu() {
           ))}
         </nav>
         <div className="mt-auto flex flex-col gap-5 pt-12">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-fg-dim">
-            {"// SOCIAL"}
-          </div>
-          <nav className="flex flex-col gap-2">
-            {SOCIALS.map((s) => (
-              <DecryptLink
-                key={s.href}
-                label={s.label}
-                href={s.href}
-                className="inline-block text-left text-sm font-semibold uppercase tracking-widest text-fg-muted transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
-              />
-            ))}
-          </nav>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-fg-dim">
-            {"// SESSION"}
-          </div>
-          {mockActive ? (
+          {mockActive && (
             <button
               type="button"
               onClick={logout}
@@ -153,10 +131,6 @@ export default function SideMenu() {
             >
               &gt; ./auth/discord --disconnect
             </button>
-          ) : (
-            <div className="font-mono text-xs uppercase tracking-widest text-fg-dim">
-              &gt; not enrolled
-            </div>
           )}
         </div>
       </aside>
