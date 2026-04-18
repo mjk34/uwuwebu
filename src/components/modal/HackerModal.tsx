@@ -27,6 +27,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
   const [bootDone, setBootDone] = useState(hasPlayedBoot);
   const ctaRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const hadHiddenRef = useRef(false);
 
   // Mark as seen once boot animation finishes (not on mount)
   // so strict-mode double-mount doesn't skip the animation
@@ -45,8 +46,30 @@ export default function HackerModal({ onClose }: HackerModalProps) {
       onClose();
     };
     dialog.addEventListener("cancel", onCancel);
-    return () => dialog.removeEventListener("cancel", onCancel);
+    return () => {
+      dialog.removeEventListener("cancel", onCancel);
+      // Safety: if the modal unmounts while the pointer is still inside the
+      // panel, restore the custom-cursor state we had before hover.
+      const root = document.documentElement;
+      root.classList.remove("cursor-system");
+      if (hadHiddenRef.current) root.classList.add("cursor-hidden");
+      hadHiddenRef.current = false;
+    };
   }, [onClose]);
+
+  const swapToSystemCursor = () => {
+    const root = document.documentElement;
+    hadHiddenRef.current = root.classList.contains("cursor-hidden");
+    if (hadHiddenRef.current) root.classList.remove("cursor-hidden");
+    root.classList.add("cursor-system");
+  };
+
+  const restoreCustomCursor = () => {
+    const root = document.documentElement;
+    root.classList.remove("cursor-system");
+    if (hadHiddenRef.current) root.classList.add("cursor-hidden");
+    hadHiddenRef.current = false;
+  };
 
   useEffect(() => {
     if (!bootDone) return;
@@ -79,7 +102,11 @@ export default function HackerModal({ onClose }: HackerModalProps) {
         if (e.target === dialogRef.current) onClose();
       }}
     >
-      <div className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(0,240,255,0.4)]">
+      <div
+        onMouseEnter={swapToSystemCursor}
+        onMouseLeave={restoreCustomCursor}
+        className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(0,240,255,0.4)]"
+      >
         <div className="flex items-center justify-between border-b border-fg-dim/30 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-fg-dim">
           <span>{"// tty/uwuversity/auth"}</span>
           <button

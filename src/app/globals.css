@@ -84,3 +84,14 @@ html.cursor-hidden *::before,
 html.cursor-hidden *::after {
   cursor: none !important;
 }
+
+html.cursor-system,
+html.cursor-system *,
+html.cursor-system *::before,
+html.cursor-system *::after {
+  cursor: auto !important;
+}
+
+html.cursor-system [data-custom-cursor] {
+  display: none !important;
+}

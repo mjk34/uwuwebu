@@ -13,8 +13,8 @@ type TerminalBootLinesProps = {
 
 export default function TerminalBootLines({
   lines,
-  charMs = 7,
-  linePauseMs = 60,
+  charMs = 2,
+  linePauseMs = 15,
   onDone,
   instant = false,
 }: TerminalBootLinesProps) {

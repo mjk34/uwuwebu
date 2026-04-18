@@ -76,6 +76,7 @@ export default function CustomCursor() {
       <div
         ref={dotRef}
         aria-hidden="true"
+        data-custom-cursor
         className="pointer-events-none fixed left-0 top-0 z-[9999] opacity-0"
         style={{
           width: DOT_SIZE,
@@ -87,6 +88,7 @@ export default function CustomCursor() {
       <div
         ref={ringRef}
         aria-hidden="true"
+        data-custom-cursor
         className="pointer-events-none fixed left-0 top-0 z-[9999] opacity-0"
         style={{
           width: RING_SIZE,
