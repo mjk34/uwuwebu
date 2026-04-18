@@ -79,25 +79,35 @@ function CategoryHeadline({cat,onClick,centered=false}){
   const color=CH[cat]||"#00f0ff";
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
   const prevCat=useRef(cat);
+  const [hover,setHover]=useState(false);
   useEffect(()=>{
     if(prevCat.current!==cat){prevCat.current=cat;scrambleTo(label);}
     else{snapTo(label);}
   },[cat,label]);
   return(
-    <div onClick={()=>{scrambleTo(label);onClick?.();}} style={{
-      position:"absolute",
-      left:centered?"50%":"calc(5vw + 50px)",
-      top:centered?"14vh":"150px",
-      transform:centered?"translateX(-50%)":undefined,
-      textAlign:centered?"center":undefined,
-      fontFamily:"'JetBrains Mono',monospace",
-      fontSize:"clamp(36px,5vw,68px)",fontWeight:900,
-      letterSpacing:"0.12em",color,lineHeight:1,
-      zIndex:15,pointerEvents:"auto",userSelect:"none",
-      cursor:"pointer",fontVariantNumeric:"tabular-nums",
-      opacity:0.92,textShadow:`0 0 40px ${color}44`,
-      whiteSpace:"nowrap",
-    }}>{display}</div>
+    <div
+      onClick={()=>{scrambleTo(label);onClick?.();}}
+      onMouseEnter={()=>setHover(true)}
+      onMouseLeave={()=>setHover(false)}
+      style={{
+        position:"absolute",
+        left:centered?"50%":"calc(5vw + 50px)",
+        top:centered?"14vh":"150px",
+        transform:centered?"translateX(-50%)":undefined,
+        textAlign:centered?"center":undefined,
+        fontFamily:"'JetBrains Mono',monospace",
+        fontSize:"clamp(36px,5vw,68px)",fontWeight:900,
+        letterSpacing:"0.12em",color,lineHeight:1,
+        zIndex:15,pointerEvents:"auto",userSelect:"none",
+        cursor:"pointer",fontVariantNumeric:"tabular-nums",
+        opacity:hover?1:0.92,
+        textShadow:hover
+          ?`0 0 18px ${color}cc, 0 0 44px ${color}88, 0 0 80px ${color}55`
+          :`0 0 14px ${color}55, 0 0 40px ${color}33`,
+        transition:"text-shadow 0.35s ease, opacity 0.35s ease",
+        whiteSpace:"nowrap",
+      }}
+    >{display}</div>
   );
 }
 
@@ -1001,11 +1011,12 @@ function AppInner(){
             setScrambleSuppressed(false);
           }}
           style={{
-            position:"relative",flex:1,minWidth:145,
-            padding:"11px 30px",
+            position:"relative",width:170,flex:"none",
+            padding:"11px 20px",
             color:mode==="live"?"#00f0ff":"#4a5164",
             transition:"color 0.35s ease",
             display:"flex",alignItems:"center",justifyContent:"center",gap:9,
+            overflow:"hidden",
           }}
         >
           {/* hover inner glow */}
@@ -1016,13 +1027,16 @@ function AppInner(){
             transition:"box-shadow 0.25s ease, background 0.25s ease",
           }}/>
           <span style={{
-            width:8,height:8,borderRadius:"50%",
+            width:8,height:8,borderRadius:"50%",flex:"none",
             background:mode==="live"?"#05ffa1":"#1f2b28",
             boxShadow:mode==="live"?"0 0 10px #05ffa1, 0 0 4px #05ffa1":"none",
             animation:mode==="live"?"glowPulse 1.6s ease-in-out infinite":"none",
             transition:"background 0.35s ease",
           }}/>
-          <span style={{position:"relative",fontVariantNumeric:"tabular-nums"}}>{mode==="live"?liveDisplay:"LIVE"}</span>
+          <span style={{
+            position:"relative",fontVariantNumeric:"tabular-nums",
+            display:"inline-block",textAlign:"center",
+          }}>{mode==="live"?liveDisplay:"LIVE"}</span>
         </div>
         {/* HISTORY side: HISTORY label always. When history is active,
             hovering scrambles the label to the history article count.
@@ -1039,11 +1053,12 @@ function AppInner(){
             setScrambleSuppressed(false);
           }}
           style={{
-            position:"relative",flex:1,minWidth:145,
-            padding:"11px 30px",
+            position:"relative",width:170,flex:"none",
+            padding:"11px 20px",
             color:mode==="history"?"#f0f1f5":"#4a5164",
             transition:"color 0.35s ease",
-            display:"flex",alignItems:"center",justifyContent:"center",
+            display:"flex",alignItems:"center",justifyContent:"center",gap:9,
+            overflow:"hidden",
           }}
         >
           {/* hover inner glow */}
@@ -1053,7 +1068,13 @@ function AppInner(){
             background:(historyHover&&mode==="history"&&!hoverDelayed)?"radial-gradient(ellipse at center, rgba(255,42,109,0.12) 0%, transparent 70%)":"transparent",
             transition:"box-shadow 0.25s ease, background 0.25s ease",
           }}/>
-          <span style={{position:"relative",fontVariantNumeric:"tabular-nums"}}>{mode==="history"?histDisplay:"HISTORY"}</span>
+          {/* Invisible spacer matching the LIVE dot, so HISTORY text sits at
+              the same visual offset inside its half. */}
+          <span aria-hidden="true" style={{width:8,height:8,visibility:"hidden",flex:"none"}}/>
+          <span style={{
+            position:"relative",fontVariantNumeric:"tabular-nums",
+            display:"inline-block",textAlign:"center",
+          }}>{mode==="history"?histDisplay:"HISTORY"}</span>
         </div>
       </div>
 
