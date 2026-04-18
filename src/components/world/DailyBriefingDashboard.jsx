@@ -74,7 +74,7 @@ const CH={world:"#ff2a6d",investments:"#05ffa1",tech:"#00f0ff"};
 
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
 const CAT_LABELS={world:"W.O.R.L.D",investments:"M.O.N.E.Y",tech:"C.Y.B.3.R"};
-function CategoryHeadline({cat,onClick}){
+function CategoryHeadline({cat,onClick,centered=false}){
   const label=CAT_LABELS[cat]||"WORLD NEWS";
   const color=CH[cat]||"#00f0ff";
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
@@ -85,13 +85,18 @@ function CategoryHeadline({cat,onClick}){
   },[cat,label]);
   return(
     <div onClick={()=>{scrambleTo(label);onClick?.();}} style={{
-      position:"absolute",left:"calc(5vw + 50px)",top:"150px",
+      position:"absolute",
+      left:centered?"50%":"calc(5vw + 50px)",
+      top:centered?"14vh":"150px",
+      transform:centered?"translateX(-50%)":undefined,
+      textAlign:centered?"center":undefined,
       fontFamily:"'JetBrains Mono',monospace",
       fontSize:"clamp(36px,5vw,68px)",fontWeight:900,
       letterSpacing:"0.12em",color,lineHeight:1,
       zIndex:15,pointerEvents:"auto",userSelect:"none",
       cursor:"pointer",fontVariantNumeric:"tabular-nums",
       opacity:0.92,textShadow:`0 0 40px ${color}44`,
+      whiteSpace:"nowrap",
     }}>{display}</div>
   );
 }
@@ -188,7 +193,7 @@ function BiasBar({bias}){
 }
 
 /* ═══════════ GLOBE ═══════════ */
-function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssScale,onUserDrag,onMarkerClick,mode}){
+function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssScale,onUserDrag,onMarkerClick,mode,visibleIds}){
   const mountRef=useRef(null);
   const S=useRef({markers:{},labels:{},targetRot:{x:0.22,y:0},currentRot:{x:0.22,y:0},dragging:false,dragMoved:false,lastMouse:{x:0,y:0},autoRotate:true,frame:null,defaultX:0.22});
 
@@ -447,7 +452,11 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
         const RADIUS=40*sclF; // 40px hit radius in screen space
         const nearby=[];
         const proj=new THREE.Vector3();
+        const vis=st._visibleIds;
         Object.entries(locMarkers).forEach(([k,m])=>{
+          // Skip markers with no items in the current feed — they're hidden
+          // in render and should not be clickable either.
+          if(vis&&!m.items.some(i=>vis.has(i.id)))return;
           proj.copy(m.pos).applyMatrix4(group.matrixWorld).project(camera);
           if(proj.z>=1)return; // behind globe
           const sx=(proj.x*.5+.5)*rect.width;
@@ -524,7 +533,16 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
       const scl=rect.width/cw; // CSS scale factor
 
       let drewLine=false;
+      const visSet=st._visibleIds;
       Object.entries(st.locMarkers).forEach(([k,m])=>{
+        // Project first so we can cheaply cull both out-of-feed and
+        // back-of-globe markers before doing any per-frame work.
+        v3.copy(m.pos).applyMatrix4(group.matrixWorld).project(camera);
+        const front=v3.z<1;
+        const hasVisible=visSet?m.items.some(i=>visSet.has(i.id)):true;
+        const shouldRender=hasVisible&&front;
+        if(m.dot.visible!==shouldRender){m.dot.visible=shouldRender;m.ring.visible=shouldRender;}
+        if(!shouldRender){const lbl=st.labels[k];if(lbl&&lbl.style.opacity!=="0")lbl.style.opacity="0";return;}
         // Check if any item at this location is focused
         const focItem=m.items.find(i=>i.id===st._focusId);
         const foc=!!focItem;
@@ -540,16 +558,14 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
           if(ci!==m.colorIdx){m.colorIdx=ci;m.dot.material.color.setHex(m.colors[ci]);m.ring.material.color.setHex(m.colors[ci]);}
         }
 
-        v3.copy(m.pos).applyMatrix4(group.matrixWorld).project(camera);
-        const front=v3.z<1;
         const ix=(v3.x*.5+.5)*cw, iy=(-v3.y*.5+.5)*ch;
         const lbl=st.labels[k];
         if(lbl){
-          lbl.style.left=`${ix-lbl.offsetWidth/2}px`;lbl.style.top=`${iy-56}px`;lbl.style.opacity=(front&&foc)?"1":"0";
+          lbl.style.left=`${ix-lbl.offsetWidth/2}px`;lbl.style.top=`${iy-56}px`;lbl.style.opacity=foc?"1":"0";
           if(foc){const hc=CH[focItem.cat]||"#00ccff";lbl.style.color=hc;lbl.style.borderColor=hc+"44";}
         }
         // Connection line from expanded news bar to globe marker
-        if(foc&&front&&svgPathRef?.current&&lineSourceRef?.current){
+        if(foc&&svgPathRef?.current&&lineSourceRef?.current){
           const ls=lineSourceRef.current;
           const gx=ix+rect.left/scl;
           const gy=iy+rect.top/scl;
@@ -573,14 +589,16 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
       (st.capMarkers||[]).forEach(cap=>{
         capV.copy(cap.pos).applyMatrix4(group.matrixWorld);
         const onFront=capV.dot(camera.position)>0; // dot product: positive = facing camera
+        if(cap.outerRing.visible!==onFront){cap.outerRing.visible=onFront;cap.innerRing.visible=onFront;cap.blocker.visible=onFront;}
+        // Back-facing: skip projection and DOM writes — can't be hovered either.
+        if(!onFront){if(cap.lbl.style.opacity!=="0")cap.lbl.style.opacity="0";return;}
         capV.project(camera);
         const sx=(capV.x*.5+.5)*rect.width,sy=(-capV.y*.5+.5)*rect.height;
         const ix=(capV.x*.5+.5)*cw,iy=(-capV.y*.5+.5)*ch;
         const dx=sx-mxS,dy=sy-myS;
-        const near=onFront&&(dx*dx+dy*dy<hoverR*hoverR);
+        const near=(dx*dx+dy*dy<hoverR*hoverR);
         cap.lbl.style.left=`${ix-cap.lbl.offsetWidth/2}px`;cap.lbl.style.top=`${iy-40}px`;
         cap.lbl.style.opacity=near?"1":"0";
-        cap.outerRing.visible=onFront;cap.innerRing.visible=onFront;cap.blocker.visible=onFront;
       });
 
       renderer.render(scene,camera);};
@@ -619,6 +637,7 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
   useEffect(()=>{S.current._hoveredId=hoveredId;},[hoveredId]);
   useEffect(()=>{S.current._onUserDrag=onUserDrag;},[onUserDrag]);
   useEffect(()=>{S.current._onMarkerClick=onMarkerClick;},[onMarkerClick]);
+  useEffect(()=>{S.current._visibleIds=visibleIds;},[visibleIds]);
   useEffect(()=>{S.current._locked=isLocked;if(isLocked){clearTimeout(S.current._returnTimer);S.current._tiltRecovering=false;}if(!isLocked){S.current.autoRotate=true;S.current._focusId=null;if(svgPathRef?.current)svgPathRef.current.style.opacity="0";}},[isLocked]);
   useEffect(()=>{if(!focusItem){S.current._focusId=null;return;}const st=S.current;st._focusId=focusItem.id;if(focusItem.lat||focusItem.lng){st.targetRot.y=-Math.PI/2-focusItem.lng*Math.PI/180;const tiltMult=focusItem.lat<0?1.6:0.4;st.targetRot.x=focusItem.lat*Math.PI/180*tiltMult+st.defaultX;st.autoRotate=false;}},[focusItem]);
   // Toggle land/ocean dot visibility when mode changes
@@ -725,6 +744,11 @@ function AppInner(){
   const filteredNewsRef=useRef(filteredNews);
   useEffect(()=>{filteredNewsRef.current=filteredNews;},[filteredNews]);
 
+  // ID set of items currently in the feed (mode-filtered). Drives which globe
+  // markers are rendered and clickable — markers whose items are all outside
+  // the current feed get hidden and excluded from hit-testing.
+  const visibleIds=useMemo(()=>new Set(baseFeed.map(n=>n.id)),[baseFeed]);
+
   // Only show filter toggles for tags that exist in current category's cards in current feed.
   // In history mode, append BOOKMARK/READ if any card in this category has those states.
   const availableTags=useMemo(()=>{
@@ -755,11 +779,16 @@ function AppInner(){
   const MAX_GAP=60;
   const feedWidth=624; // 564px card + 40px left offset + 20px right margin
   const globeWidth=viewW*0.55;
+  // Mobile: drop the globe + connection line, center the feed & headline.
+  const isMobile=viewW<768;
   const naturalFeedLeft=viewW*0.05;
   const naturalGlobeLeft=viewW*(1-0.02-0.55); // right:2vw, width:55vw
   const naturalGap=naturalGlobeLeft-(naturalFeedLeft+feedWidth);
   let feedLeft,globeLeft;
-  if(naturalGap<=MAX_GAP){
+  if(isMobile){
+    feedLeft=(viewW-feedWidth)/2;
+    globeLeft=0;
+  }else if(naturalGap<=MAX_GAP){
     feedLeft=naturalFeedLeft;
     globeLeft=naturalGlobeLeft;
   }else{
@@ -822,11 +851,19 @@ function AppInner(){
   };
   const handleMarkerClick=useCallback((locKey,itemIds)=>{
     if(!itemIds||!itemIds.length)return;
+    // Globe markers are built from the full NEWS set, but the feed is filtered
+    // by mode (live/history). Restrict target selection to items actually in
+    // the current feed — otherwise setActiveId gets bounced back by the
+    // "active not in baseFeed" guard, producing the visual of the globe
+    // snapping back to the previously-active card.
+    const feedIds=new Set(baseFeed.map(n=>n.id));
+    const visible=itemIds.filter(id=>feedIds.has(id));
+    if(!visible.length)return;
     let targetId;
-    if(itemIds.includes(expandedId)){const curIdx=itemIds.indexOf(expandedId);targetId=itemIds[(curIdx+1)%itemIds.length];}
-    else{targetId=itemIds[0];}
-    if(targetId!=null){playSfx("tick-data-9");setActiveId(targetId);}
-  },[expandedId]);
+    if(visible.includes(expandedId)){const curIdx=visible.indexOf(expandedId);targetId=visible[(curIdx+1)%visible.length];}
+    else{targetId=visible[0];}
+    if(targetId!=null){playSfx("tick-data-9");setActiveTags([]);setActiveId(targetId);}
+  },[expandedId,baseFeed]);
 
   // Wheel scroll through items (cyclic within filtered feed)
   useEffect(()=>{
@@ -861,12 +898,14 @@ function AppInner(){
       <ParallaxDots/>
       <div style={ST.bgGrid}/>
       <div style={ST.bgGrad}/>
-      <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",zIndex:25,pointerEvents:"none"}}>
-        <path ref={svgPathRef} fill="none" stroke="none" strokeWidth="2" strokeDasharray="8 5" opacity="0" style={{transition:"opacity .5s"}}/>
-      </svg>
+      {!isMobile&&(
+        <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",zIndex:25,pointerEvents:"none"}}>
+          <path ref={svgPathRef} fill="none" stroke="none" strokeWidth="2" strokeDasharray="8 5" opacity="0" style={{transition:"opacity .5s"}}/>
+        </svg>
+      )}
 
       {/* ── CATEGORY HEADLINE ── */}
-      <CategoryHeadline cat={activeCat} onClick={jumpToFirst}/>
+      <CategoryHeadline cat={activeCat} onClick={jumpToFirst} centered={isMobile}/>
 
       {/* ── LIVE / HISTORY TOGGLE ── */}
       <div
@@ -1210,9 +1249,11 @@ function AppInner(){
       </div>
 
       {/* ── GLOBE ── */}
-      <div id="globe-wrap" style={{...ST.globeWrap,left:globeLeft,width:globeWidth}}>
-        <Globe news={NEWS} hoveredId={hoveredId} focusItem={focusItem} isLocked={expandedId!==null} lineSourceRef={lineSourceRef} svgPathRef={svgPathRef} cssScale={1} onUserDrag={handleGlobeDrag} onMarkerClick={handleMarkerClick} mode={mode}/>
-      </div>
+      {!isMobile&&(
+        <div id="globe-wrap" style={{...ST.globeWrap,left:globeLeft,width:globeWidth}}>
+          <Globe news={NEWS} hoveredId={hoveredId} focusItem={focusItem} isLocked={expandedId!==null} lineSourceRef={lineSourceRef} svgPathRef={svgPathRef} cssScale={1} onUserDrag={handleGlobeDrag} onMarkerClick={handleMarkerClick} mode={mode} visibleIds={visibleIds}/>
+        </div>
+      )}
 
     </div>
   </>);
