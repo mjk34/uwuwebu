@@ -74,7 +74,7 @@ const C3={world:0xff2a6d,investments:0x05ffa1,tech:0x00f0ff};
 const CH={world:"#ff2a6d",investments:"#05ffa1",tech:"#00f0ff"};
 
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
-const CAT_LABELS={world:"WORLD",investments:"ECON",tech:"CYBER"};
+const CAT_LABELS={world:"WORLD NEWS",investments:"ECONOMICS",tech:"CYBERSECURITY"};
 const CAT_CYCLE=["world","investments","tech"];
 function CategoryHeadline({cat,count=0,onClick,centered=false}){
   const label=CAT_LABELS[cat]||"WORLD NEWS";
