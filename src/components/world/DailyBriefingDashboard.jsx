@@ -96,8 +96,8 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
     // chev.scrambleTo identity is stable enough — only re-run on hover/count flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[hover,count]);
-  // Chev colors cross-fade with its text: current cat on rest, next cat on hover.
-  const chevColor=hover?nextColor:color;
+  // Count reads white at rest; hover cross-fades to next-cat color for the ">>".
+  const chevColor=hover?nextColor:"#ffffff";
   return(
     <div
       onClick={()=>{scrambleTo(label);chev.scrambleTo(">>");onClick?.();}}
