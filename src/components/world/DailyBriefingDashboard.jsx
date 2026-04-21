@@ -49,6 +49,16 @@ const LIVE_WINDOW=3*DAY;
 // cat across the 30-day window; surfacing more than this overwhelms the
 // vertical carousel.
 const PER_CAT_CAP=10;
+// Active card summary is hard-capped so the expanded card height stays
+// predictable; cut at the last complete word before the limit.
+const ACTIVE_SUMMARY_MAX=175;
+function truncateAtWord(text,max){
+  if(!text||text.length<=max)return text||"";
+  const slice=text.slice(0,max);
+  const lastSpace=slice.lastIndexOf(" ");
+  const cut=lastSpace>0?slice.slice(0,lastSpace):slice;
+  return cut.replace(/[.,;:!?—-]+$/,"")+"…";
+}
 const NOW=Date.now();
 function timeStr(ts){const d=NOW-ts;if(d<HOUR)return Math.max(1,Math.round(d/60000))+"m";if(d<DAY)return Math.round(d/HOUR)+"h";return Math.round(d/DAY)+"d";}
 
@@ -1409,10 +1419,10 @@ function AppInner(){
                 {isActive&&<>
                   <div style={{overflow:"hidden",marginTop:10}}>
                     <div style={{paddingRight:14}}>
-                      <div style={ST.expText}>{item.summary}</div>
+                      <div style={ST.expText}>{truncateAtWord(item.summary,ACTIVE_SUMMARY_MAX)}</div>
                       <div style={{...ST.foot,marginTop:10}}>
-                        <BiasBar bias={item.bias}/>
-                        <span style={{...ST.rel,color:item.rel>85?"#05ffa1":item.rel>70?"#f5c518":"#ff2a6d",borderColor:item.rel>85?"#05ffa133":item.rel>70?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>
+                        {item.cat!=="tech"&&<BiasBar bias={item.bias}/>}
+                        {item.cat!=="tech"&&<span style={{...ST.rel,color:item.rel>85?"#05ffa1":item.rel>70?"#f5c518":"#ff2a6d",borderColor:item.rel>85?"#05ffa133":item.rel>70?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>}
                         {/* TODO(phase2-auth): bookmark + read buttons disabled until login lands. */}
                         {/*
                         {(()=>{
