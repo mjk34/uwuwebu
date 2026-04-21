@@ -230,6 +230,10 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
 
   useEffect(()=>{
     const el=mountRef.current;if(!el)return;const st=S.current;
+    // News arrives async from R2; defer globe init until we have items so the
+    // locMarkers map isn't built from an empty feed (which would leave the
+    // focus-line branch permanently dark).
+    if(!news||news.length===0)return;
     const w=el.clientWidth,h=el.clientHeight;
     // Cancellation plumbing: unmount should abort the atlas fetch, block deferred
     // builders from touching a disposed scene, and let cleanup dispose THREE resources.
@@ -663,7 +667,7 @@ function Globe({news,hoveredId,focusItem,isLocked,lineSourceRef,svgPathRef,cssSc
       renderer.dispose();
       if(el.contains(renderer.domElement))el.removeChild(renderer.domElement);
     };
-  },[]);
+  },[news]);
 
   useEffect(()=>{S.current._hoveredId=hoveredId;},[hoveredId]);
   useEffect(()=>{S.current._onUserDrag=onUserDrag;},[onUserDrag]);
