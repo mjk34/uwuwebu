@@ -3,15 +3,35 @@
 import { useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
 
+/**
+ * A line can be a plain string (uses defaults) or a richer spec when you need
+ * to override the gap after it or run a slow-typed range inside it.
+ *   - pauseAfter: ms gap before the next line starts (overrides linePauseMs)
+ *   - slowFrom/slowTo/slowMult: chars in [from, to) type at slowMult× weight
+ */
+export type LineSpec = {
+  text: string;
+  pauseAfter?: number;
+  slowFrom?: number;
+  slowTo?: number;
+  slowMult?: number;
+};
+
+type LineInput = string | LineSpec;
+
 type TerminalBootLinesProps = {
-  lines: string[];
+  lines: LineInput[];
   /** Target end-to-end duration in ms, from first character to last. */
   totalMs?: number;
-  /** Pause between lines (included in totalMs). */
+  /** Default pause between lines (used when a LineSpec doesn't set pauseAfter). */
   linePauseMs?: number;
   onDone?: () => void;
   instant?: boolean;
 };
+
+function normalize(line: LineInput): LineSpec {
+  return typeof line === "string" ? { text: line } : line;
+}
 
 export default function TerminalBootLines({
   lines,
@@ -20,7 +40,9 @@ export default function TerminalBootLines({
   onDone,
   instant = false,
 }: TerminalBootLinesProps) {
-  const [printed, setPrinted] = useState<string[]>(instant ? lines : []);
+  const specs = lines.map(normalize);
+  const texts = specs.map(s => s.text);
+  const [printed, setPrinted] = useState<string[]>(instant ? texts : []);
   const [current, setCurrent] = useState("");
   const done = useRef(false);
 
@@ -33,7 +55,7 @@ export default function TerminalBootLines({
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
-      setPrinted(lines);
+      setPrinted(texts);
       setCurrent("");
       done.current = true;
       onDone?.();
@@ -44,27 +66,50 @@ export default function TerminalBootLines({
     setPrinted([]);
     setCurrent("");
 
-    // Precompute a fixed timeline: when each line starts/ends (ms from t=0).
-    // Time spent typing is (totalMs - pauses between lines); last line has no
-    // trailing pause so completion == end of last line.
-    const totalChars = lines.reduce((n, l) => n + l.length, 0);
-    const pauseTotal = Math.max(0, lines.length - 1) * linePauseMs;
-    const typeTotal = Math.max(1, totalMs - pauseTotal);
-    const msPerChar = totalChars > 0 ? typeTotal / totalChars : 0;
+    // Per-character weight: slow ranges run at slowMult so they consume more
+    // of the totalMs budget. Default weight is 1.
+    const charWeights: number[][] = specs.map(s => {
+      const w = new Array(s.text.length).fill(1);
+      if (s.slowFrom != null && s.slowTo != null) {
+        const mult = s.slowMult ?? 3;
+        const lo = Math.max(0, s.slowFrom);
+        const hi = Math.min(s.text.length, s.slowTo);
+        for (let i = lo; i < hi; i++) w[i] = mult;
+      }
+      return w;
+    });
+    const totalWeight = charWeights.reduce(
+      (n, line) => n + line.reduce((a, b) => a + b, 0),
+      0,
+    );
+    const pauses = specs.map((s, i) =>
+      i === specs.length - 1 ? 0 : s.pauseAfter ?? linePauseMs,
+    );
+    const pauseTotal = pauses.reduce((a, b) => a + b, 0);
+    const typeBudget = Math.max(1, totalMs - pauseTotal);
+    const msPerWeight = totalWeight > 0 ? typeBudget / totalWeight : 0;
+
+    // Precompute per-char start times within each line and per-line bounds.
     const lineStart: number[] = [];
     const lineEnd: number[] = [];
+    const charStart: number[][] = [];
     let cursor = 0;
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < specs.length; i++) {
       lineStart.push(cursor);
-      cursor += lines[i].length * msPerChar;
+      const starts: number[] = [];
+      for (let c = 0; c < charWeights[i].length; c++) {
+        starts.push(cursor);
+        cursor += charWeights[i][c] * msPerWeight;
+      }
+      charStart.push(starts);
       lineEnd.push(cursor);
-      if (i < lines.length - 1) cursor += linePauseMs;
+      cursor += pauses[i];
     }
     const totalDur = cursor;
 
     // Flatten char lookup for SFX decisions (every 3rd non-space char).
     const flat: string[] = [];
-    for (const l of lines) for (const c of l) flat.push(c);
+    for (const t of texts) for (const c of t) flat.push(c);
 
     let startTs = 0;
     let raf = 0;
@@ -76,22 +121,33 @@ export default function TerminalBootLines({
       const elapsed = now - startTs;
 
       // Find the line currently being typed (or just finished) by elapsed time.
-      let li = lines.length - 1;
-      for (let i = 0; i < lines.length; i++) {
+      let li = texts.length - 1;
+      for (let i = 0; i < texts.length; i++) {
         if (elapsed < lineEnd[i]) { li = i; break; }
       }
-      const charsInLine = elapsed < lineStart[li]
-        ? 0
-        : elapsed >= lineEnd[li]
-          ? lines[li].length
-          : Math.floor((elapsed - lineStart[li]) / msPerChar);
+      let charsInLine: number;
+      if (elapsed < lineStart[li]) {
+        charsInLine = 0;
+      } else if (elapsed >= lineEnd[li]) {
+        charsInLine = texts[li].length;
+      } else {
+        // Find the largest c whose start time has been reached.
+        const starts = charStart[li];
+        let lo = 0, hi = starts.length;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (starts[mid] <= elapsed) lo = mid + 1;
+          else hi = mid;
+        }
+        charsInLine = lo;
+      }
 
-      setPrinted(lines.slice(0, li));
-      setCurrent(lines[li].slice(0, charsInLine));
+      setPrinted(texts.slice(0, li));
+      setCurrent(texts[li].slice(0, charsInLine));
 
       // Fire typing SFX for each new character that appeared this frame.
       let cumChars = 0;
-      for (let i = 0; i < li; i++) cumChars += lines[i].length;
+      for (let i = 0; i < li; i++) cumChars += texts[i].length;
       cumChars += charsInLine;
       while (sfxCursor < cumChars) {
         const ch = flat[sfxCursor];
@@ -100,7 +156,7 @@ export default function TerminalBootLines({
       }
 
       if (elapsed >= totalDur) {
-        setPrinted(lines);
+        setPrinted(texts);
         setCurrent("");
         done.current = true;
         onDone?.();

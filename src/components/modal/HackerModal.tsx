@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import TerminalBootLines from "./TerminalBootLines";
+import TerminalBootLines, { type LineSpec } from "./TerminalBootLines";
 import { setMockSession } from "@/lib/session";
 import { playSfx } from "@/lib/sfx";
 import { setBgMusicDimmed } from "@/components/home/BgMusic";
@@ -10,14 +10,21 @@ type HackerModalProps = {
   onClose: () => void;
 };
 
-const BOOT_LINES = [
-  "$ curl -s uwuversity://uplink/handshake | jq .",
-  '{ "status": "ready", "node": "professor-rs:4875" }',
-  "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local",
-  "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y",
-  "$ sudo ./enroll --provider=discord --scope=full",
-  "[pid 6769] spawning auth daemon.............. ok",
-  "awaiting operator >>>",
+// Three command/response pairs + final prompt. Each command groups with its
+// response (no pause between), and a 20ms beat separates the pairs. Line 6
+// runs its dots at 5× weight so the spawn animation visibly slows mid-line.
+const SPAWN_LINE = "[pid 6769] spawning auth daemon.............. ok";
+const DOTS_FROM = SPAWN_LINE.indexOf(".");
+const DOTS_TO = SPAWN_LINE.indexOf(" ok");
+
+const BOOT_LINES: LineSpec[] = [
+  { text: "$ curl -s uwuversity://uplink/handshake | jq .", pauseAfter: 0 },
+  { text: '{ "status": "ready", "node": "professor-rs:4875" }', pauseAfter: 20 },
+  { text: "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local", pauseAfter: 0 },
+  { text: "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y", pauseAfter: 20 },
+  { text: "$ sudo ./enroll --provider=discord --scope=full", pauseAfter: 0 },
+  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 5, pauseAfter: 20 },
+  { text: "awaiting operator >>>" },
 ];
 
 const CTA_TEXT = "> ./auth/discord --connect";
