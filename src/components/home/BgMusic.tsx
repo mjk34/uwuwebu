@@ -5,11 +5,21 @@ import { isMuted } from "@/lib/session";
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
+const DEFAULT_VOLUME = 0.04;
+const DIMMED_VOLUME = 0.008;
+
 // Singleton — syncBgMusicMute reaches across from MuteToggle
 let bgAudio: HTMLAudioElement | null = null;
+// Ref-counted so overlapping surfaces (side menu + auth modal) don't race the restore
+let dimCount = 0;
 
 export function syncBgMusicMute(mute: boolean): void {
   if (bgAudio) bgAudio.muted = mute;
+}
+
+export function setBgMusicDimmed(dim: boolean): void {
+  dimCount = Math.max(0, dimCount + (dim ? 1 : -1));
+  if (bgAudio) bgAudio.volume = dimCount > 0 ? DIMMED_VOLUME : DEFAULT_VOLUME;
 }
 
 export default function BgMusic() {
@@ -17,7 +27,7 @@ export default function BgMusic() {
 
   useEffect(() => {
     const audio = new Audio(`${basePath}/music/home.mp3`);
-    audio.volume = 0.04;
+    audio.volume = dimCount > 0 ? DIMMED_VOLUME : DEFAULT_VOLUME;
     audio.muted = isMuted();
     bgAudio = audio;
 

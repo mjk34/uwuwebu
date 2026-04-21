@@ -7,6 +7,7 @@ import { menuStore } from "@/lib/menu-store";
 import { clearLocal, hasMockSession, LocalKeys } from "@/lib/session";
 import { useSubscribedValue } from "@/lib/client-values";
 import type { SfxName } from "@/lib/sfx";
+import { setBgMusicDimmed } from "@/components/home/BgMusic";
 
 type NavItem = {
   label: string;
@@ -39,6 +40,7 @@ export default function SideMenu() {
 
   useEffect(() => {
     if (!open) return;
+    setBgMusicDimmed(true);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         menuStore.setOpen(false);
@@ -54,6 +56,7 @@ export default function SideMenu() {
       panelRef.current?.focus();
     }, 40);
     return () => {
+      setBgMusicDimmed(false);
       window.removeEventListener("keydown", onKey);
       window.clearTimeout(t);
       prev?.focus?.();

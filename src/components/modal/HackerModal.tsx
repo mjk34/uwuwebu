@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import TerminalBootLines from "./TerminalBootLines";
 import { setMockSession } from "@/lib/session";
 import { playSfx } from "@/lib/sfx";
+import { setBgMusicDimmed } from "@/components/home/BgMusic";
 
 type HackerModalProps = {
   onClose: () => void;
@@ -40,6 +41,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
     const dialog = dialogRef.current;
     if (!dialog) return;
     dialog.showModal();
+    setBgMusicDimmed(true);
 
     const onCancel = (e: Event) => {
       e.preventDefault();
@@ -48,6 +50,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
     dialog.addEventListener("cancel", onCancel);
     return () => {
       dialog.removeEventListener("cancel", onCancel);
+      setBgMusicDimmed(false);
       // Safety: if the modal unmounts while the pointer is still inside the
       // panel, restore the custom-cursor state we had before hover.
       const root = document.documentElement;
