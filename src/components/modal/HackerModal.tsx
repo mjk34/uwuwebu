@@ -124,7 +124,8 @@ export default function HackerModal({ onClose }: HackerModalProps) {
         <div className="min-h-[360px] px-7 py-6">
           <TerminalBootLines
             lines={BOOT_LINES}
-            totalMs={600}
+            totalMs={700}
+            linePauseMs={8}
             onDone={handleDone}
             instant={hasPlayedBoot}
           />
