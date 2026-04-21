@@ -124,8 +124,8 @@ export default function HackerModal({ onClose }: HackerModalProps) {
         <div className="min-h-[360px] px-7 py-6">
           <TerminalBootLines
             lines={BOOT_LINES}
-            totalMs={700}
-            linePauseMs={8}
+            totalMs={1000}
+            linePauseMs={10}
             onDone={handleDone}
             instant={hasPlayedBoot}
           />
@@ -134,7 +134,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
               ref={ctaRef}
               type="button"
               onClick={handleConnect}
-              className="group mt-5 block w-full rounded-sm bg-accent/95 px-3 py-2 text-left font-mono text-base text-bg-deep transition-all hover:bg-accent hover:shadow-[0_0_16px_rgba(0,240,255,0.4)] focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="group mt-5 block w-full rounded-sm bg-accent/95 px-3 py-2 text-left font-mono text-base text-bg-deep transition-all hover:bg-accent hover:shadow-[0_0_32px_rgba(0,240,255,0.85),0_0_64px_rgba(0,240,255,0.45)] focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:shadow-[0_0_32px_rgba(0,240,255,0.85),0_0_64px_rgba(0,240,255,0.45)]"
             >
               <span>{CTA_TEXT}</span>
               <span
