@@ -76,21 +76,28 @@ const CH={world:"#ff2a6d",investments:"#05ffa1",tech:"#00f0ff"};
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
 const CAT_LABELS={world:"W.O.R.L.D",investments:"M.O.N.E.Y",tech:"C.Y.B.3.R"};
 const CAT_CYCLE=["world","investments","tech"];
-function CategoryHeadline({cat,onClick,centered=false}){
+function CategoryHeadline({cat,count=0,onClick,centered=false}){
   const label=CAT_LABELS[cat]||"WORLD NEWS";
   const color=CH[cat]||"#00f0ff";
   const nextCat=CAT_CYCLE[(CAT_CYCLE.indexOf(cat)+1)%CAT_CYCLE.length];
   const nextColor=CH[nextCat]||"#00f0ff";
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
-  // Separate scramble for the chevron affordance — short fixed-length string,
-  // so disable length scaling and run a tight window.
-  const chev=useScramble(">>",{duration:220,interval:16,scaleByLength:false});
+  // Same slot cycles between the current-cat count (resting) and ">>" (hover).
+  // Short fixed-length strings, so disable length scaling.
+  const chev=useScramble(String(count),{duration:220,interval:16,scaleByLength:false});
   const prevCat=useRef(cat);
   const [hover,setHover]=useState(false);
   useEffect(()=>{
     if(prevCat.current!==cat){prevCat.current=cat;scrambleTo(label);}
     else{snapTo(label);}
   },[cat,label]);
+  useEffect(()=>{
+    chev.scrambleTo(hover?">>":String(count));
+    // chev.scrambleTo identity is stable enough — only re-run on hover/count flips
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[hover,count]);
+  // Chev colors cross-fade with its text: current cat on rest, next cat on hover.
+  const chevColor=hover?nextColor:color;
   return(
     <div
       onClick={()=>{scrambleTo(label);chev.scrambleTo(">>");onClick?.();}}
@@ -113,19 +120,17 @@ function CategoryHeadline({cat,onClick,centered=false}){
       }}
     >
       {display}
-      {/* Skip-to-next-category affordance: chevrons render in the next cat's
-          color so the click target previews where it'll take you. Absolute
-          positioning keeps the label centered as if the chevrons weren't
-          present — they hang off the right edge instead of pushing the text. */}
+      {/* Resting: article count in current cat color. Hover: decrypts to ">>"
+          in next cat's color (click target preview). Absolute so the label
+          stays centered — the slot hangs off the right edge either way. */}
       <span style={{
         position:"absolute",
         left:"100%",
         top:0,
         marginLeft:"0.4em",
-        color:nextColor,
-        textShadow:`0 0 14px ${nextColor}55, 0 0 40px ${nextColor}33`,
-        opacity:hover?1:0,
-        transition:"opacity 0.18s ease",
+        color:chevColor,
+        textShadow:`0 0 14px ${chevColor}55, 0 0 40px ${chevColor}33`,
+        transition:"color 0.18s ease, text-shadow 0.18s ease",
         pointerEvents:"none",
       }}>{chev.display}</span>
     </div>
@@ -1055,7 +1060,7 @@ function AppInner(){
       )}
 
       {/* ── CATEGORY HEADLINE ── */}
-      <CategoryHeadline cat={activeCat} onClick={jumpToFirst} centered={isMobile}/>
+      <CategoryHeadline cat={activeCat} count={baseFeed.filter(n=>n.cat===activeCat).length} onClick={jumpToFirst} centered={isMobile}/>
 
       {/* ── LIVE / HISTORY TOGGLE ── */}
       <div
