@@ -74,7 +74,7 @@ const C3={world:0xff2a6d,investments:0x05ffa1,tech:0x00f0ff};
 const CH={world:"#ff2a6d",investments:"#05ffa1",tech:"#00f0ff"};
 
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
-const CAT_LABELS={world:"W.O.R.L.D",investments:"M.O.N.E.Y",tech:"C.Y.B.3.R"};
+const CAT_LABELS={world:"WORLD",investments:"ECON",tech:"CYBER"};
 const CAT_CYCLE=["world","investments","tech"];
 function CategoryHeadline({cat,count=0,onClick,centered=false}){
   const label=CAT_LABELS[cat]||"WORLD NEWS";
@@ -127,7 +127,7 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
         position:"absolute",
         left:"100%",
         top:0,
-        marginLeft:"0.4em",
+        marginLeft:"0.9em",
         color:chevColor,
         textShadow:`0 0 14px ${chevColor}55, 0 0 40px ${chevColor}33`,
         transition:"color 0.18s ease, text-shadow 0.18s ease",
