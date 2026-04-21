@@ -5,6 +5,7 @@ export type SfxName =
   | "click"
   | "type"
   | "modal-open"
+  | "menu-open"
   | "tick"
   | "tick-metallic"
   | "tick-data"
@@ -115,6 +116,24 @@ export function playSfx(name: SfxName): void {
       tone(220, 120, "sawtooth", 0.06);
       window.setTimeout(() => tone(330, 140, "sawtooth", 0.05), 60);
       return;
+    case "menu-open": {
+      // Cyber "panel deploy": HP noise whoosh + downward square chirp + sub thump.
+      const now2 = ac.currentTime;
+      noiseBurst(90, 0.05, 2400);
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(1800, now2);
+      osc.frequency.exponentialRampToValueAtTime(380, now2 + 0.18);
+      g.gain.setValueAtTime(0, now2);
+      g.gain.linearRampToValueAtTime(0.05, now2 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, now2 + 0.22);
+      osc.connect(g).connect(masterOut(ac));
+      osc.start(now2);
+      osc.stop(now2 + 0.25);
+      window.setTimeout(() => tone(70, 140, "sine", 0.07), 30);
+      return;
+    }
     case "tick-metallic": {
       tone(800, 40, "sine", 0.09);
       window.setTimeout(() => tone(800, 100, "sine", 0.09), 60);

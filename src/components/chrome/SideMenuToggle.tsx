@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { menuStore } from "@/lib/menu-store";
+import { playSfx } from "@/lib/sfx";
 
 export default function SideMenuToggle() {
   const open = useSyncExternalStore(
@@ -11,6 +12,7 @@ export default function SideMenuToggle() {
   );
 
   const handleClick = () => {
+    if (!open) playSfx("menu-open");
     menuStore.toggle();
   };
 
