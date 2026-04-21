@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore
 import * as THREE from "three";
 import { playSfx } from "@/lib/sfx";
 import { useScramble } from "@/hooks/useScramble";
+import { fetchNews } from "@/lib/news";
+import NewsDetailModal from "@/components/world/NewsDetailModal";
 
 /* ═══════════ REDUCED MOTION ═══════════ */
 let _reducedMotion=false;
@@ -38,30 +40,19 @@ return <canvas ref={canvasRef} style={{position:"fixed",inset:0,zIndex:0,pointer
 
 
 /* ═══════════ DATA ═══════════ */
-const HOUR=3600*1000,DAY=24*HOUR,WEEK=7*DAY;
+const HOUR=3600*1000,DAY=24*HOUR;
+// LIVE feed = items inside this window AND unread; everything older OR read
+// rolls into HISTORY. Pipeline retains 30 days; dashboard shows that full
+// window split between the two buckets.
+const LIVE_WINDOW=3*DAY;
+// Hard cap on cards displayed per category. Pipeline can hold dozens per
+// cat across the 30-day window; surfacing more than this overwhelms the
+// vertical carousel.
+const PER_CAT_CAP=10;
 const NOW=Date.now();
 function timeStr(ts){const d=NOW-ts;if(d<HOUR)return Math.max(1,Math.round(d/60000))+"m";if(d<DAY)return Math.round(d/HOUR)+"h";return Math.round(d/DAY)+"d";}
 
-const NEWS = [
-  {id:1,cat:"world",sub:"Geopolitics",tags:["DIPLOMACY","WAR"],title:"EU Summit Tackles Eastern European Defense Overhaul",src:"Reuters",bias:0.02,rel:92,lat:50.85,lng:4.35,dateTs:NOW-2*HOUR,place:"Brussels, Belgium",summary:"European leaders convene in Brussels debating a unified €200B defense package to shore up NATO's eastern flank via joint air defense procurement."},
-  {id:2,cat:"world",sub:"Geopolitics",tags:["WAR","DIPLOMACY"],title:"South China Sea Tensions Spike After Joint Naval Drills",src:"AP News",bias:-0.05,rel:90,lat:14.5,lng:114.0,dateTs:NOW-3*HOUR,place:"South China Sea",summary:"Philippines and Australia conduct freedom-of-navigation exercises in contested waters. China calls the drills 'provocative' as ASEAN urges restraint."},
-  {id:3,cat:"world",sub:"Geopolitics",tags:["DIPLOMACY"],title:"India-Pakistan Border Talks Resume After 18-Month Freeze",src:"Al Jazeera",bias:-0.12,rel:80,lat:28.61,lng:77.21,dateTs:NOW-5*HOUR,place:"New Delhi, India",summary:"Diplomatic backchannel reopens in New Delhi with water-sharing rights under the Indus Waters Treaty and trade normalization as primary agenda items."},
-  {id:4,cat:"world",sub:"US Politics",tags:["POLITICS"],title:"Senate Clears Procedural Vote on Infrastructure Renewal",src:"CNN",bias:-0.35,rel:68,lat:38.9,lng:-77.0,dateTs:NOW-1*HOUR,place:"Washington, DC",summary:"The $1.2T proposal advances past filibuster with bipartisan support, funding broadband, bridge repairs, EV chargers, and water infrastructure nationwide."},
-  {id:5,cat:"world",sub:"US Politics",tags:["POLITICS","SOCIETY"],title:"White House Announces New AI Executive Order",src:"Fox News",bias:0.42,rel:60,lat:38.9,lng:-77.04,dateTs:NOW-10*DAY,place:"Washington, DC",summary:"Administration mandates safety testing for frontier AI models exceeding 10²⁶ FLOP with mandatory compute cluster reporting. Industry response mixed."},
-  {id:6,cat:"world",sub:"Climate",tags:["CLIMATE","DIPLOMACY"],title:"Pacific Islands Forum Demands Binding Climate Action",src:"BBC",bias:0.05,rel:88,lat:-18.14,lng:178.44,dateTs:NOW-5*HOUR,place:"Suva, Fiji",summary:"Island nations led by Fiji call for binding 1.5°C emissions targets and climate loss funds, citing accelerating sea level rise threats to existence."},
-  {id:7,cat:"world",sub:"Disaster",tags:["DISASTER","CLIMATE"],title:"Typhoon Oscar Makes Landfall in Northern Philippines",src:"AP News",bias:0.0,rel:92,lat:14.6,lng:120.98,dateTs:NOW-6*HOUR,place:"Manila, Philippines",summary:"Category 4 storm brings 250kph winds and 30cm rainfall forecasts, displacing 3M people across Luzon. State of calamity declared nationwide."},
-  {id:8,cat:"world",sub:"Health",tags:["HEALTH"],title:"WHO Raises Alert on Avian Flu Human-to-Human Cases",src:"Reuters",bias:-0.05,rel:95,lat:46.2,lng:6.14,dateTs:NOW-14*DAY,place:"Geneva, Switzerland",summary:"Three confirmed H5N1 clusters in Cambodia prompt PHEIC deliberations. WHO urges enhanced surveillance while antiviral stockpile expansion accelerates."},
-  {id:9,cat:"investments",sub:"Markets",tags:["MARKETS","CORPORATE"],title:"S&P 500 Rallies to Record on Blowout Earnings",src:"Bloomberg",bias:0.08,rel:90,lat:40.71,lng:-74.0,dateTs:NOW-1*HOUR,place:"New York, USA",summary:"Index breaks 6,100 as megacap tech delivers 22% average YoY earnings growth. Market breadth improves with 78% of components above 200-day MA."},
-  {id:10,cat:"investments",sub:"Markets",tags:["MARKETS","MACRO"],title:"European Markets Diverge Ahead of ECB Decision",src:"CNBC",bias:0.12,rel:78,lat:51.51,lng:-0.13,dateTs:NOW-3*HOUR,place:"London, UK",summary:"DAX dips 0.4% on weak factory orders while FTSE 100 holds steady, buoyed by mining and energy stocks on commodity strength."},
-  {id:11,cat:"investments",sub:"Crypto",tags:["CRYPTO"],title:"Bitcoin Reclaims $95K as Spot ETF Inflows Surge",src:"CoinDesk",bias:0.0,rel:72,lat:37.77,lng:-122.42,dateTs:NOW-8*DAY,place:"San Francisco, USA",summary:"BlackRock's IBIT sees $1.2B single-day inflow — largest since launch. On-chain metrics show long-term holders accumulating aggressively."},
-  {id:12,cat:"investments",sub:"Commodities",tags:["COMMODITIES","MARKETS"],title:"Copper Futures Jump on Chilean Mine Disruption",src:"Financial Times",bias:0.10,rel:88,lat:-33.45,lng:-70.67,dateTs:NOW-6*HOUR,place:"Santiago, Chile",summary:"Escondida mine workers vote to strike, threatening 5% of global copper output. LME copper pushes past $10,800/tonne."},
-  {id:13,cat:"tech",sub:"Breach",tags:["BREACH","PRIVACY"],title:"Major Genetics Firm Breach Exposes 14M User Records",src:"BleepingComputer",bias:0.0,rel:85,lat:37.37,lng:-122.03,dateTs:NOW-1*HOUR,place:"Sunnyvale, USA",summary:"Attackers siphoned 14M user profiles via credential stuffing over 5 months. Leaked data includes ancestry DNA and family network graphs."},
-  {id:14,cat:"tech",sub:"APT",tags:["NATIONSTATE","INFRA"],title:"Volt Typhoon Implants Found in US Power Grid",src:"The Record",bias:0.0,rel:94,lat:39.1,lng:-76.77,dateTs:NOW-5*HOUR,place:"Fort Meade, USA",summary:"CISA attributes long-dwell intrusions across 11 utility companies to PRC-affiliated group. Pre-positioning targets wartime disruption capability."},
-  {id:15,cat:"tech",sub:"Ransomware",tags:["RANSOMWARE","INFRA"],title:"LockBit Affiliate Paralyzes Regional Hospital Chain",src:"Reuters",bias:0.0,rel:89,lat:38.63,lng:-90.2,dateTs:NOW-9*DAY,place:"St. Louis, USA",summary:"Ascension's 140-hospital network forced to paper records for 8 days. LockBit 4.0 variant bypasses EDR via BYOVD. FBI advisory issued nationwide."},
-  {id:16,cat:"tech",sub:"Exploit",tags:["EXPLOIT"],title:"Critical RCE in OpenSSL 3.4 — Patch Now",src:"BleepingComputer",bias:0.0,rel:82,lat:39.68,lng:-75.75,dateTs:NOW-3*HOUR,place:"Newark, USA",summary:"CVE-2026-1234 (CVSS 9.8) allows RCE via crafted X.509 certificates. All OpenSSL 3.x versions affected. Patches available across major distros."},
-  {id:17,cat:"tech",sub:"Phishing",tags:["PHISHING","BREACH"],title:"EvilProxy Campaign Hits 120 Fortune 500 Firms",src:"KrebsOnSecurity",bias:0.0,rel:91,lat:37.42,lng:-122.08,dateTs:NOW-6*HOUR,place:"Mountain View, USA",summary:"Adversary-in-the-middle kit defeats MFA via session cookie theft. Execs triaged through LinkedIn before spear-phishing. 12 confirmed breaches."},
-  {id:18,cat:"tech",sub:"Infrastructure",tags:["INFRA","MALWARE"],title:"Texas Water Utility Cyberattack Disrupts Service",src:"CyberScoop",bias:0.0,rel:87,lat:30.27,lng:-97.74,dateTs:NOW-12*DAY,place:"Austin, USA",summary:"Attacker manipulates ICS/SCADA triggering pressure spikes. Residents advised to boil water for 3 days. TSA advisory targets 170K US water systems."},
-];
+// NEWS is loaded inside AppInner via fetchNews() — see useEffect on mount.
 
 const ALL_TAGS = {
   world:["WAR","POLITICS","DIPLOMACY","CLIMATE","DISASTER","SOCIETY","HEALTH","CRIME"],
@@ -74,10 +65,16 @@ const CH={world:"#ff2a6d",investments:"#05ffa1",tech:"#00f0ff"};
 
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
 const CAT_LABELS={world:"W.O.R.L.D",investments:"M.O.N.E.Y",tech:"C.Y.B.3.R"};
+const CAT_CYCLE=["world","investments","tech"];
 function CategoryHeadline({cat,onClick,centered=false}){
   const label=CAT_LABELS[cat]||"WORLD NEWS";
   const color=CH[cat]||"#00f0ff";
+  const nextCat=CAT_CYCLE[(CAT_CYCLE.indexOf(cat)+1)%CAT_CYCLE.length];
+  const nextColor=CH[nextCat]||"#00f0ff";
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
+  // Separate scramble for the chevron affordance — short fixed-length string,
+  // so disable length scaling and run a tight window.
+  const chev=useScramble(">>",{duration:220,interval:16,scaleByLength:false});
   const prevCat=useRef(cat);
   const [hover,setHover]=useState(false);
   useEffect(()=>{
@@ -86,7 +83,7 @@ function CategoryHeadline({cat,onClick,centered=false}){
   },[cat,label]);
   return(
     <div
-      onClick={()=>{scrambleTo(label);onClick?.();}}
+      onClick={()=>{scrambleTo(label);chev.scrambleTo(">>");onClick?.();}}
       onMouseEnter={()=>setHover(true)}
       onMouseLeave={()=>setHover(false)}
       style={{
@@ -100,14 +97,28 @@ function CategoryHeadline({cat,onClick,centered=false}){
         letterSpacing:"0.12em",color,lineHeight:1,
         zIndex:15,pointerEvents:"auto",userSelect:"none",
         cursor:"pointer",fontVariantNumeric:"tabular-nums",
-        opacity:hover?1:0.92,
-        textShadow:hover
-          ?`0 0 18px ${color}cc, 0 0 44px ${color}88, 0 0 80px ${color}55`
-          :`0 0 14px ${color}55, 0 0 40px ${color}33`,
-        transition:"text-shadow 0.35s ease, opacity 0.35s ease",
+        opacity:0.92,
+        textShadow:`0 0 14px ${color}55, 0 0 40px ${color}33`,
         whiteSpace:"nowrap",
       }}
-    >{display}</div>
+    >
+      {display}
+      {/* Skip-to-next-category affordance: chevrons render in the next cat's
+          color so the click target previews where it'll take you. Absolute
+          positioning keeps the label centered as if the chevrons weren't
+          present — they hang off the right edge instead of pushing the text. */}
+      <span style={{
+        position:"absolute",
+        left:"100%",
+        top:0,
+        marginLeft:"0.4em",
+        color:nextColor,
+        textShadow:`0 0 14px ${nextColor}55, 0 0 40px ${nextColor}33`,
+        opacity:hover?1:0,
+        transition:"opacity 0.18s ease",
+        pointerEvents:"none",
+      }}>{chev.display}</span>
+    </div>
   );
 }
 
@@ -672,9 +683,39 @@ export default function App(){
 }
 
 function AppInner(){
+  // Live news feed from R2 via /api/news proxy. Empty until first fetch
+  // resolves; downstream useMemos all key off this array, so they recompute
+  // when it lands.
+  const [NEWS,setNEWS]=useState([]);
+  // "live" once R2 returns data; "fallback" if we landed on the bundled
+  // public/news.json (R2 unreachable). Drives the LIVE-dot color.
+  const [newsSource,setNewsSource]=useState("live");
+  useEffect(()=>{
+    let cancelled=false;
+    fetchNews().then(feed=>{
+      if(cancelled)return;
+      // Drop cards that still have mock-LLM placeholder synthesis text. These
+      // sneak in when Stage 6 falls back to the mock client (no fixture for a
+      // given cluster). With real Claude wired up they should disappear; this
+      // filter is the belt-and-suspenders so a half-failed run can't leak
+      // "Cluster synthesis placeholder headline." into the carousel.
+      const isPlaceholder=n=>{
+        const t=(n.title||"").toLowerCase();
+        const s=(n.summary||"").toLowerCase();
+        return t.includes("placeholder")||s.includes("placeholder");
+      };
+      setNEWS(feed.cards.filter(n=>!isPlaceholder(n)));
+      setNewsSource(feed.source);
+    }).catch(err=>{
+      console.error("[news] fetch failed",err);
+    });
+    return()=>{cancelled=true;};
+  },[]);
   const [hoveredId,setHoveredId]=useState(null);
   const [focusItem,setFocusItem]=useState(null);
-  const [activeId,setActiveId]=useState(NEWS[0].id);
+  const [activeId,setActiveId]=useState(null);
+  // Selected card for the detail modal — null = closed.
+  const [detailItem,setDetailItem]=useState(null);
   const [viewH,setViewH]=useState(()=>typeof window!=="undefined"?window.innerHeight:900);
   const [viewW,setViewW]=useState(()=>typeof window!=="undefined"?window.innerWidth:1400);
   const [cardMouse,setCardMouse]=useState({x:0.5,y:0.5});
@@ -694,32 +735,50 @@ function AppInner(){
   },[mode]);
   const{display:liveDisplay,scrambleTo:scrambleLive,snapTo:snapLive}=useScramble("LIVE",{duration:240,interval:18});
   const{display:histDisplay,scrambleTo:scrambleHist,snapTo:snapHist}=useScramble("HISTORY",{duration:240,interval:18});
-  const [bookmarkedIds,setBookmarkedIds]=useState(()=>new Set());
-  const [readIds,setReadIds]=useState(()=>new Set());
-  const toggleBookmark=useCallback(id=>{
-    setBookmarkedIds(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});
-  },[]);
-  const toggleRead=useCallback(id=>{
-    setReadIds(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});
-  },[]);
+  // TODO(phase2-auth): bookmark/read state. Disabled until Discord OAuth +
+  // professor-rs bookmark API land — see project memory `news_bookmarks_design`.
+  // const [bookmarkedIds,setBookmarkedIds]=useState(()=>new Set());
+  // const [readIds,setReadIds]=useState(()=>new Set());
+  // const toggleBookmark=useCallback(id=>{
+  //   setBookmarkedIds(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});
+  // },[]);
+  // const toggleRead=useCallback(id=>{
+  //   setReadIds(prev=>{const n=new Set(prev);if(n.has(id))n.delete(id);else n.add(id);return n;});
+  // },[]);
   const barRefs=useRef({});
 
   const lineSourceRef=useRef(null),svgPathRef=useRef(null);
   const lerpRafRef=useRef(null);
   const cardMouseTargetRef=useRef({x:0.5,y:0.5});
 
-  // Base feed: items belong to live (recent + unread) or history (old OR read)
-  const baseFeed=useMemo(()=>{
-    const isOld=n=>(NOW-n.dateTs)>WEEK;
-    if(mode==="live")return NEWS.filter(n=>!readIds.has(n.id)&&!isOld(n));
-    return NEWS.filter(n=>readIds.has(n.id)||isOld(n));
-  },[mode,readIds]);
+  // Base feed: split purely by age. Read-state filter is disabled until auth
+  // lands — see TODO(phase2-auth) above.
+  // Cap each category to PER_CAT_CAP, keeping the most-recent N. NEWS may
+  // arrive in any order from R2; sort by recency first so the cap keeps the
+  // freshest headlines, then regroup by cat (CAT_CYCLE order) for display so
+  // the carousel shows all of one cat together before the next.
+  const capPerCat=useCallback(items=>{
+    const byRecency=[...items].sort((a,b)=>b.dateTs-a.dateTs);
+    const counts={};
+    const kept=byRecency.filter(n=>{
+      counts[n.cat]=(counts[n.cat]||0)+1;
+      return counts[n.cat]<=PER_CAT_CAP;
+    });
+    const catRank=Object.fromEntries(CAT_CYCLE.map((c,i)=>[c,i]));
+    return kept.sort((a,b)=>(catRank[a.cat]??99)-(catRank[b.cat]??99)||b.dateTs-a.dateTs);
+  },[]);
 
-  // Totals for both sides — shown via decryption scramble on hover of the
-  // active side's label. Inactive side stays static, so we can't derive from
-  // baseFeed alone.
-  const liveCount=useMemo(()=>NEWS.filter(n=>!readIds.has(n.id)&&(NOW-n.dateTs)<=WEEK).length,[readIds]);
-  const historyCount=useMemo(()=>NEWS.filter(n=>readIds.has(n.id)||(NOW-n.dateTs)>WEEK).length,[readIds]);
+  const baseFeed=useMemo(()=>{
+    const isOld=n=>(NOW-n.dateTs)>LIVE_WINDOW;
+    const eligible=NEWS.filter(n=>mode==="live"?!isOld(n):isOld(n));
+    return capPerCat(eligible);
+  },[mode,NEWS,capPerCat]);
+
+  // Totals for both sides — counts reflect the post-cap visible feed so the
+  // hover number matches what's actually scrollable. Hover on the inactive
+  // side recomputes from NEWS since baseFeed only covers the active mode.
+  const liveCount=useMemo(()=>capPerCat(NEWS.filter(n=>(NOW-n.dateTs)<=LIVE_WINDOW)).length,[NEWS,capPerCat]);
+  const historyCount=useMemo(()=>capPerCat(NEWS.filter(n=>(NOW-n.dateTs)>LIVE_WINDOW)).length,[NEWS,capPerCat]);
 
   // Snap both displays back to labels whenever the active mode changes, so a
   // stale count from a prior hover doesn't linger on the newly-active side.
@@ -751,18 +810,14 @@ function AppInner(){
   },[]);
 
   // Filtered feed: tag filter applies only to active category; other categories pass through.
-  // Special tags BOOKMARK and READ (history mode) filter by id set membership.
+  // TODO(phase2-auth): re-enable BOOKMARK/READ pseudo-tag branches when auth lands.
   const filteredNews=useMemo(()=>{
     if(activeTags.length===0)return baseFeed;
     return baseFeed.filter(n=>{
       if(n.cat!==activeCat)return true;
-      return activeTags.some(t=>{
-        if(t==="BOOKMARK")return bookmarkedIds.has(n.id);
-        if(t==="READ")return readIds.has(n.id);
-        return n.tags.includes(t);
-      });
+      return activeTags.some(t=>n.tags.includes(t));
     });
-  },[activeTags,activeCat,baseFeed,bookmarkedIds,readIds]);
+  },[activeTags,activeCat,baseFeed]);
 
   // Ref mirror so stable event handlers (wheel) always see the latest filtered list
   const filteredNewsRef=useRef(filteredNews);
@@ -774,18 +829,13 @@ function AppInner(){
   const visibleIds=useMemo(()=>new Set(baseFeed.map(n=>n.id)),[baseFeed]);
 
   // Only show filter toggles for tags that exist in current category's cards in current feed.
-  // In history mode, append BOOKMARK/READ if any card in this category has those states.
+  // TODO(phase2-auth): in history mode, append BOOKMARK/READ when those Sets exist.
   const availableTags=useMemo(()=>{
     const catItems=baseFeed.filter(n=>n.cat===activeCat);
     const tagSet=new Set();
     catItems.forEach(n=>n.tags.forEach(t=>tagSet.add(t)));
-    const tags=ALL_TAGS[activeCat].filter(t=>tagSet.has(t));
-    if(mode==="history"){
-      if(catItems.some(n=>bookmarkedIds.has(n.id)))tags.push("BOOKMARK");
-      if(catItems.some(n=>readIds.has(n.id)))tags.push("READ");
-    }
-    return tags;
-  },[activeCat,baseFeed,mode,bookmarkedIds,readIds]);
+    return ALL_TAGS[activeCat].filter(t=>tagSet.has(t));
+  },[activeCat,baseFeed]);
 
   // After a tag toggle, jump to the first card in the current category matching the filter
   useEffect(()=>{
@@ -1078,11 +1128,13 @@ function AppInner(){
             background:(liveHover&&mode==="live"&&!hoverDelayed)?"radial-gradient(ellipse at center, rgba(0,240,255,0.12) 0%, transparent 70%)":"transparent",
             transition:"box-shadow 0.25s ease, background 0.25s ease",
           }}/>
-          <span style={{
+          {/* Dot color signals data source: green pulse = live R2 feed,
+              solid orange = bundled fallback (CORS broken or R2 down). */}
+          <span title={mode==="live"?(newsSource==="fallback"?"using bundled fallback — live feed unreachable":"live feed"):undefined} style={{
             width:isMobile?4:8,height:isMobile?4:8,borderRadius:"50%",flex:"none",
-            background:mode==="live"?"#05ffa1":"#1f2b28",
-            boxShadow:mode==="live"?"0 0 10px #05ffa1, 0 0 4px #05ffa1":"none",
-            animation:mode==="live"?"glowPulse 1.6s ease-in-out infinite":"none",
+            background:mode==="live"?(newsSource==="fallback"?"#ff9933":"#05ffa1"):"#1f2b28",
+            boxShadow:mode==="live"?(newsSource==="fallback"?"0 0 10px #ff9933, 0 0 4px #ff9933":"0 0 10px #05ffa1, 0 0 4px #05ffa1"):"none",
+            animation:mode==="live"&&newsSource!=="fallback"?"glowPulse 1.6s ease-in-out infinite":"none",
             transition:"background 0.35s ease",
           }}/>
           <span style={{
@@ -1307,7 +1359,35 @@ function AppInner(){
                 </svg>
               </>}
               <div style={{position:"relative",zIndex:1,overflow:"hidden"}}>
-                <div style={ST.row1}><span style={{...ST.src,color:acc}}>{item.src}</span><span style={ST.time}>{timeStr(item.dateTs)}</span></div>
+                <div style={ST.row1}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+                    <span style={ST.time}>{timeStr(item.dateTs)}</span>
+                    <span style={{...ST.src,color:acc,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item.src}</span>
+                    {item.sourceCount>1&&<span style={{fontSize:10,color:"#858eaa",fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>+{item.sourceCount-1}</span>}
+                  </div>
+                  {isActive&&(
+                    <button
+                      onClick={e=>{e.stopPropagation();setDetailItem(item);}}
+                      title="View details"
+                      aria-label="View details"
+                      style={{
+                        width:24,height:24,padding:0,flex:"none",
+                        background:"transparent",border:`1px solid ${acc}55`,borderRadius:4,
+                        color:acc,cursor:"pointer",display:"inline-flex",
+                        alignItems:"center",justifyContent:"center",
+                        transition:"background 0.15s ease, border-color 0.15s ease, color 0.15s ease",
+                      }}
+                      onMouseEnter={e=>{e.currentTarget.style.background=acc;e.currentTarget.style.borderColor=acc;e.currentTarget.style.color="#0a0b12";}}
+                      onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor=`${acc}55`;e.currentTarget.style.color=acc;}}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/>
+                        <line x1="10" y1="14" x2="21" y2="3"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
                 <div style={ST.itemTitle}>{item.title}</div>
                 {isActive&&item.tags&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:4,marginBottom:2}}>
                   {item.tags.map(t=>{
@@ -1323,19 +1403,22 @@ function AppInner(){
                       <div style={{...ST.foot,marginTop:10}}>
                         <BiasBar bias={item.bias}/>
                         <span style={{...ST.rel,color:item.rel>85?"#05ffa1":item.rel>70?"#f5c518":"#ff2a6d",borderColor:item.rel>85?"#05ffa133":item.rel>70?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>
+                        {/* TODO(phase2-auth): bookmark + read buttons disabled until login lands. */}
+                        {/*
                         {(()=>{
-                          const bm=bookmarkedIds.has(item.id);
-                          const rd=readIds.has(item.id);
+                          const bm=bookmarkedIds.has(item.clusterId);
+                          const rd=readIds.has(item.clusterId);
                           const btnStyle=on=>({padding:"2px 6px",border:`1px solid ${on?acc:acc+"44"}`,borderRadius:4,background:on?acc:"transparent",color:on?"#0a0b12":acc,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",height:22,transition:"background 0.15s ease, color 0.15s ease, border-color 0.15s ease"});
                           return(<>
-                            <button onClick={e=>{e.stopPropagation();toggleBookmark(item.id);}} style={btnStyle(bm)} title={bm?"Remove bookmark":"Bookmark"}>
+                            <button onClick={e=>{e.stopPropagation();toggleBookmark(item.clusterId);}} style={btnStyle(bm)} title={bm?"Remove bookmark":"Bookmark"}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill={bm?"currentColor":"none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                             </button>
-                            <button onClick={e=>{e.stopPropagation();toggleRead(item.id);}} style={btnStyle(rd)} title={rd?"Mark unread":"Mark read"}>
+                            <button onClick={e=>{e.stopPropagation();toggleRead(item.clusterId);}} style={btnStyle(rd)} title={rd?"Mark unread":"Mark read"}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             </button>
                           </>);
                         })()}
+                        */}
                         {item.place&&<span style={{fontSize:12,color:"#858eaa",fontFamily:"'JetBrains Mono',monospace",marginLeft:"auto"}}>📍 {item.place}</span>}
                       </div>
                     </div>
@@ -1355,6 +1438,8 @@ function AppInner(){
         </div>
       )}
 
+      <NewsDetailModal item={detailItem} onClose={()=>setDetailItem(null)} accent={detailItem?CH[detailItem.cat]:"#00f0ff"}/>
+
     </div>
   </>);
 }
@@ -1367,9 +1452,9 @@ const ST={
   feedWrap:{position:"absolute",top:0,height:"100vh",zIndex:10,pointerEvents:"auto",overflow:"hidden"},
   carousel:{position:"relative",height:"100%",width:"100%",overflow:"hidden",WebkitMaskImage:"linear-gradient(to bottom,transparent 0%,transparent 20%,black 30%,black 75%,transparent 85%)",maskImage:"linear-gradient(to bottom,transparent 0%,transparent 20%,black 30%,black 75%,transparent 85%)"},
   globeWrap:{position:"absolute",top:"25vh",height:"90vh",zIndex:12,pointerEvents:"auto"},
-  row1:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6},
+  row1:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,gap:10},
   src:{fontSize:12,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",textTransform:"uppercase"},
-  time:{fontSize:11,color:"#858eaa",fontFamily:"'JetBrains Mono',monospace"},
+  time:{fontSize:11,color:"#858eaa",fontFamily:"'JetBrains Mono',monospace",letterSpacing:1,flex:"none"},
   itemTitle:{fontSize:18,fontWeight:700,color:"#f0f1f5",lineHeight:1.4,marginBottom:6,letterSpacing:0.5},
   preview:{fontSize:13,color:"#858eaa",lineHeight:1.55},
   expText:{fontSize:14,lineHeight:1.75,color:"#b2b7c7"},
