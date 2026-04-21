@@ -753,14 +753,24 @@ function AppInner(){
 
   // Base feed: split purely by age. Read-state filter is disabled until auth
   // lands — see TODO(phase2-auth) above.
-  // Cap each category to PER_CAT_CAP, keeping the most-recent N. NEWS may
-  // arrive in any order from R2; sort by recency first so the cap keeps the
-  // freshest headlines, then regroup by cat (CAT_CYCLE order) for display so
-  // the carousel shows all of one cat together before the next.
+  // Cap each category to PER_CAT_CAP, keeping the highest-scoring N. Score is
+  // recency-decayed importance: (rel * sourceCount) / (1 + ageHours/HALF_LIFE).
+  //   - rel (0..100) — pipeline article relevance, averaged per cluster
+  //   - sourceCount  — wider coverage = bigger story
+  //   - decay        — fresh stories outrank stale ones of equal importance
+  // For LIVE mode the decay punishes 12h+ stories; for HISTORY the decay
+  // flattens out (everything is >24h) so importance dominates naturally.
+  // Display order stays grouped by CAT_CYCLE then recent-first within cat.
   const capPerCat=useCallback(items=>{
-    const byRecency=[...items].sort((a,b)=>b.dateTs-a.dateTs);
+    const HALF_LIFE_H=12;
+    const score=n=>{
+      const ageH=Math.max(0,(NOW-n.dateTs)/3600000);
+      const imp=(n.rel||0)*Math.max(1,n.sourceCount||1);
+      return imp/(1+ageH/HALF_LIFE_H);
+    };
+    const byScore=[...items].sort((a,b)=>score(b)-score(a));
     const counts={};
-    const kept=byRecency.filter(n=>{
+    const kept=byScore.filter(n=>{
       counts[n.cat]=(counts[n.cat]||0)+1;
       return counts[n.cat]<=PER_CAT_CAP;
     });
