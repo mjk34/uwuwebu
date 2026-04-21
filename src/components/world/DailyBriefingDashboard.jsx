@@ -84,7 +84,8 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
   // Same slot cycles between the current-cat count (resting) and ">>" (hover).
   // Short fixed-length strings, so disable length scaling.
-  const chev=useScramble(String(count),{duration:220,interval:16,scaleByLength:false});
+  const padded=String(count).padStart(2,"0");
+  const chev=useScramble(padded,{duration:220,interval:16,scaleByLength:false});
   const prevCat=useRef(cat);
   const [hover,setHover]=useState(false);
   useEffect(()=>{
@@ -92,10 +93,10 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
     else{snapTo(label);}
   },[cat,label]);
   useEffect(()=>{
-    chev.scrambleTo(hover?">>":String(count));
+    chev.scrambleTo(hover?">>":padded);
     // chev.scrambleTo identity is stable enough — only re-run on hover/count flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[hover,count]);
+  },[hover,padded]);
   // Count reads white at rest; hover cross-fades to next-cat color for the ">>".
   const chevColor=hover?nextColor:"#ffffff";
   return(
