@@ -23,7 +23,7 @@ const BOOT_LINES: LineSpec[] = [
   { text: "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local", pauseAfter: 0 },
   { text: "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y", pauseAfter: 25 },
   { text: "$ sudo ./enroll --provider=discord --scope=full", pauseAfter: 0 },
-  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 5, pauseAfter: 25 },
+  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 10.5, pauseAfter: 25 },
   { text: "awaiting operator >>>" },
 ];
 
@@ -131,7 +131,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
         <div className="min-h-[360px] px-7 py-6">
           <TerminalBootLines
             lines={BOOT_LINES}
-            totalMs={3745}
+            totalMs={3246}
             linePauseMs={10}
             onDone={handleDone}
             instant={hasPlayedBoot}
