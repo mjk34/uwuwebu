@@ -4,6 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { scrambleStep } from "@/lib/decrypt";
 import { playSfx, type SfxName } from "@/lib/sfx";
 
+// Global suppression counter — callers can silence scramble sfx for a
+// window (e.g. while a modal is open, so pill-label resets don't chatter).
+let sfxSuppressCount = 0;
+export function suppressScrambleSfx(): () => void {
+  sfxSuppressCount += 1;
+  return () => {
+    sfxSuppressCount = Math.max(0, sfxSuppressCount - 1);
+  };
+}
+
 type UseScrambleOpts = {
   duration?: number;
   interval?: number;
@@ -64,7 +74,7 @@ export function useScramble(initial: string, opts: UseScrambleOpts = {}) {
         const progress = Math.min(1, elapsed / dur);
         const revealed = Math.floor(progress * target.length);
         setDisplay(scrambleStep(target, revealed));
-        if (progress < 1 && tickCount % sfxEvery === 0) playSfx(sfx);
+        if (progress < 1 && tickCount % sfxEvery === 0 && sfxSuppressCount === 0) playSfx(sfx);
         tickCount += 1;
         if (progress >= 1) {
           stop();

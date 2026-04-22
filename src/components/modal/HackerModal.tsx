@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import TerminalBootLines, { type LineSpec } from "./TerminalBootLines";
+import NeofetchSplash from "./NeofetchSplash";
 import { setMockSession } from "@/lib/session";
 import { playSfx } from "@/lib/sfx";
+import { suppressScrambleSfx } from "@/hooks/useScramble";
 import { setBgMusicDimmed } from "@/components/home/BgMusic";
 
 type HackerModalProps = {
@@ -32,6 +34,7 @@ const CTA_TEXT = "> ./auth/discord --connect";
 let hasPlayedBoot = false;
 
 export default function HackerModal({ onClose }: HackerModalProps) {
+  const [splashDone, setSplashDone] = useState(hasPlayedBoot);
   const [bootDone, setBootDone] = useState(hasPlayedBoot);
   const ctaRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -49,6 +52,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
     if (!dialog) return;
     dialog.showModal();
     setBgMusicDimmed(true);
+    const releaseScrambleSfx = suppressScrambleSfx();
 
     const onCancel = (e: Event) => {
       e.preventDefault();
@@ -58,6 +62,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
     return () => {
       dialog.removeEventListener("cancel", onCancel);
       setBgMusicDimmed(false);
+      releaseScrambleSfx();
       // Safety: if the modal unmounts while the pointer is still inside the
       // panel, restore the custom-cursor state we had before hover.
       const root = document.documentElement;
@@ -117,8 +122,16 @@ export default function HackerModal({ onClose }: HackerModalProps) {
         onMouseLeave={restoreCustomCursor}
         className="relative w-full max-w-3xl overflow-hidden rounded-md border border-accent/40 bg-bg-deep shadow-[0_0_80px_-10px_rgba(0,240,255,0.4)]"
       >
-        <div className="flex items-center justify-between border-b border-fg-dim/30 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-fg-dim">
-          <span>{"// tty/uwuversity/auth"}</span>
+        <div className="flex items-center justify-between border-b border-fg-dim/30 bg-bg-raised/40 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-fg-dim">
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full bg-ok animate-[status-pulse_2s_ease-in-out_infinite]"
+            />
+            <span className="text-ok/80">SECURE</span>
+            <span className="text-fg-dim/40">│</span>
+            <span>{"// tty/uwuversity/auth"}</span>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -129,13 +142,16 @@ export default function HackerModal({ onClose }: HackerModalProps) {
           </button>
         </div>
         <div className="min-h-[360px] px-7 py-6">
-          <TerminalBootLines
-            lines={BOOT_LINES}
-            totalMs={3971}
-            linePauseMs={10}
-            onDone={handleDone}
-            instant={hasPlayedBoot}
-          />
+          <NeofetchSplash onDone={() => setSplashDone(true)} instant={hasPlayedBoot} />
+          {splashDone && (
+            <TerminalBootLines
+              lines={BOOT_LINES}
+              totalMs={3531}
+              linePauseMs={10}
+              onDone={handleDone}
+              instant={hasPlayedBoot}
+            />
+          )}
           {bootDone && (
             <button
               ref={ctaRef}
