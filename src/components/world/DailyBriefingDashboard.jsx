@@ -51,7 +51,7 @@ const LIVE_WINDOW=3*DAY;
 const PER_CAT_CAP=10;
 // Active card summary is hard-capped so the expanded card height stays
 // predictable; cut at the last complete word before the limit.
-const ACTIVE_SUMMARY_MAX=175;
+const ACTIVE_SUMMARY_MAX=170;
 function truncateAtWord(text,max){
   if(!text||text.length<=max)return text||"";
   const slice=text.slice(0,max);
