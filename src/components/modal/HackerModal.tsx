@@ -19,14 +19,20 @@ const SPAWN_LINE = "[pid 6769] spawning auth daemon.............. ok";
 const DOTS_FROM = SPAWN_LINE.indexOf(".");
 const DOTS_TO = SPAWN_LINE.indexOf(" ok");
 
+const FINGERPRINT_LINE = "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y";
+// "Hesitation" beat: stretch the space before the final "y" to ~70ms so
+// the confirmation keystroke lands with a visible pause.
+const FP_GAP_FROM = FINGERPRINT_LINE.length - 2;
+const FP_GAP_TO = FINGERPRINT_LINE.length - 1;
+
 const BOOT_LINES: LineSpec[] = [
   { text: "$ curl -s uwuversity://uplink/handshake | jq .", pauseAfter: 0 },
-  { text: '{ "status": "ready", "node": "professor-rs:4875" }', pauseAfter: 150 },
+  { text: '{ "status": "ready", "node": "professor-rs:4875" }', pauseAfter: 150, sfxAfterPause: "enter" },
   { text: "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local", pauseAfter: 0 },
-  { text: "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y", pauseAfter: 150 },
+  { text: FINGERPRINT_LINE, slowFrom: FP_GAP_FROM, slowTo: FP_GAP_TO, slowMult: 10, pauseAfter: 150, sfxAfterPause: "enter" },
   { text: "$ sudo ./enroll --provider=discord --scope=full", pauseAfter: 0 },
   { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 14, pauseAfter: 150 },
-  { text: "awaiting operator >>>" },
+  { text: "awaiting operator >>>", className: "text-ok" },
 ];
 
 const CTA_TEXT = "> ./auth/discord --connect";
@@ -136,9 +142,22 @@ export default function HackerModal({ onClose }: HackerModalProps) {
             type="button"
             onClick={onClose}
             aria-label="Close terminal"
-            className="flex min-h-11 min-w-11 items-center justify-center text-fg-muted transition-all hover:text-accent hover:drop-shadow-[0_0_8px_rgba(0,240,255,0.5)] focus-visible:text-accent focus-visible:outline-none"
+            className="flex h-7 w-7 items-center justify-center rounded-sm border border-accent/30 text-accent transition-colors hover:border-accent hover:bg-accent hover:text-bg-deep focus-visible:border-accent focus-visible:bg-accent focus-visible:text-bg-deep focus-visible:outline-none"
           >
-            [X]
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
         <div className="min-h-[360px] px-7 py-6">

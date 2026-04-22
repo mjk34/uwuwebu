@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { playSfx } from "@/lib/sfx";
+import { playSfx, type SfxName } from "@/lib/sfx";
 
 /**
  * A line can be a plain string (uses defaults) or a richer spec when you need
  * to override the gap after it or run a slow-typed range inside it.
  *   - pauseAfter: ms gap before the next line starts (overrides linePauseMs)
  *   - slowFrom/slowTo/slowMult: chars in [from, to) type at slowMult× weight
+ *   - sfxAfterPause: fire this sfx once at the end of pauseAfter (pre-next-line)
+ *   - className: Tailwind classes applied to this line's rendered row
  */
 export type LineSpec = {
   text: string;
@@ -15,6 +17,8 @@ export type LineSpec = {
   slowFrom?: number;
   slowTo?: number;
   slowMult?: number;
+  sfxAfterPause?: SfxName;
+  className?: string;
 };
 
 type LineInput = string | LineSpec;
@@ -122,9 +126,18 @@ export default function TerminalBootLines({
       }
     }
 
+    // Pause-end sfx triggers: fired once when elapsed crosses each threshold.
+    const pauseSfx: { time: number; sfx: SfxName }[] = [];
+    for (let i = 0; i < specs.length; i++) {
+      if (specs[i].sfxAfterPause && pauses[i] > 0) {
+        pauseSfx.push({ time: lineEnd[i] + pauses[i], sfx: specs[i].sfxAfterPause! });
+      }
+    }
+
     let startTs = 0;
     let raf = 0;
     let sfxCursor = 0;
+    let pauseSfxCursor = 0;
 
     const tick = (now: number) => {
       if (done.current) return;
@@ -166,6 +179,12 @@ export default function TerminalBootLines({
         sfxCursor++;
       }
 
+      // Fire pause-end SFX (e.g. heavy enter-key beat before next command).
+      while (pauseSfxCursor < pauseSfx.length && elapsed >= pauseSfx[pauseSfxCursor].time) {
+        playSfx(pauseSfx[pauseSfxCursor].sfx);
+        pauseSfxCursor++;
+      }
+
       if (elapsed >= totalDur) {
         setPrinted(texts);
         setCurrent("");
@@ -188,9 +207,11 @@ export default function TerminalBootLines({
   return (
     <div className="font-mono text-sm leading-6 text-fg-muted">
       {printed.map((line, i) => (
-        <div key={i}>{line}</div>
+        <div key={i} className={specs[i]?.className}>{line}</div>
       ))}
-      {current && <div>{current}</div>}
+      {current && (
+        <div className={specs[printed.length]?.className}>{current}</div>
+      )}
     </div>
   );
 }

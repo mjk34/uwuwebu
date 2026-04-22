@@ -4,6 +4,7 @@ export type SfxName =
   | "hover"
   | "click"
   | "type"
+  | "enter"
   | "modal-open"
   | "menu-open"
   | "tick"
@@ -107,6 +108,12 @@ export function playSfx(name: SfxName): void {
     case "type":
       noiseBurst(6, 0.05, 6000);
       tone(4000, 4, "sine", 0.02);
+      return;
+    case "enter":
+      // Heavier keystroke: broader-band click + low body thump + sub tail.
+      noiseBurst(10, 0.09, 900);
+      tone(150, 70, "sine", 0.16);
+      tone(70, 110, "sine", 0.09);
       return;
     case "tick":
       noiseBurst(22, 0.06, 2400);
