@@ -209,6 +209,8 @@ export default function TerminalBootLines({
   }, [instant]);
 
   const renderLine = (text: string, spec?: LineSpec) => {
+    // Empty spec line: render a non-breaking space so the row still has height.
+    if (text === "" && spec?.text === "") return " ";
     const tailFrom = spec?.tailFrom;
     const tailCls = spec?.tailClassName;
     // Split into body + tail when the visible slice has reached tailFrom.

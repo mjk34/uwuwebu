@@ -4,7 +4,6 @@ export type SfxName =
   | "hover"
   | "click"
   | "type"
-  | "enter"
   | "modal-open"
   | "menu-open"
   | "tick"
@@ -108,13 +107,6 @@ export function playSfx(name: SfxName): void {
     case "type":
       noiseBurst(6, 0.05, 6000);
       tone(4000, 4, "sine", 0.02);
-      return;
-    case "enter":
-      // Thocky keystroke, dry: sharp housing click + low-mid tonal punch
-      // with exp-decay gain envelope (damped before it rings). No noise
-      // tail — that read as deflating air in the previous pass.
-      noiseBurst(6, 0.12, 2800);
-      tone(200, 55, "triangle", 0.13);
       return;
     case "tick":
       noiseBurst(22, 0.06, 2400);
