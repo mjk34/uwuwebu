@@ -590,7 +590,12 @@ export default function NewsDetailModal({ item, onClose, accent }) {
                           )}
                           {a.claims && a.claims.length > 0 && (
                             <div>
-                              <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>CLAIMS</div>
+                              <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>
+                                CLAIMS (
+                                <span style={{ color: GREEN, fontWeight: 700 }}>F</span>=FACT{" "}
+                                <span style={{ color: AMBER, fontWeight: 700 }}>A</span>=ANALYSIS{" "}
+                                <span style={{ color: PINK, fontWeight: 700 }}>O</span>=OPINION)
+                              </div>
                               <ul style={{ ...listStyle, gap: 4 }}>
                                 {a.claims.map((c, j) => (
                                   <li key={j} style={{
@@ -600,7 +605,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
                                     <span style={{
                                       position: "absolute", left: 0, top: 4,
                                       fontSize: 9, fontWeight: 700, letterSpacing: 1,
-                                      color: c.type === "fact" ? GREEN : c.type === "opinion" ? AMBER : MUTED,
+                                      color: c.type === "fact" ? GREEN : c.type === "analysis" ? AMBER : c.type === "opinion" ? PINK : MUTED,
                                     }}>{(c.type || "?").charAt(0).toUpperCase()}</span>
                                     {c.claim}
                                   </li>
