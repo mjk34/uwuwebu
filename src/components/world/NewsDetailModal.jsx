@@ -100,14 +100,13 @@ function CoverageBar({ coverage, accent }) {
         <div style={{ width: pct(coverage.right), background: PINK }} />
       </div>
       <div style={{
-        display: "flex", justifyContent: "space-between", marginTop: 6,
+        display: "grid", gridTemplateColumns: "1fr 1fr 1fr", marginTop: 6,
         fontSize: 11, fontFamily: "'JetBrains Mono',monospace",
         color: MUTED, letterSpacing: 1,
       }}>
-        <span><span style={{ color: CYAN }}>L</span> {coverage.left || 0}</span>
-        <span><span style={{ color: "#fff" }}>C</span> {coverage.center || 0}</span>
-        <span><span style={{ color: PINK }}>R</span> {coverage.right || 0}</span>
-        <span style={{ color: accent }}>Σ {total}</span>
+        <span style={{ textAlign: "left" }}><span style={{ color: CYAN }}>L</span> {coverage.left || 0}</span>
+        <span style={{ textAlign: "center" }}><span style={{ color: "#fff" }}>C</span> {coverage.center || 0}</span>
+        <span style={{ textAlign: "right" }}><span style={{ color: PINK }}>R</span> {coverage.right || 0}</span>
       </div>
     </div>
   );
@@ -414,34 +413,36 @@ export default function NewsDetailModal({ item, onClose, accent }) {
             <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: TEXT }}>{item.summary}</p>
           </Section>
 
-          {/* Coverage */}
-          <Section title="Coverage" accent={accent}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <div>
-                <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>BIAS DISTRIBUTION</div>
-                <BiasMini bias={biasMedNorm} />
-                {typeof item.biasSpread === "number" && (
-                  <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>spread: {item.biasSpread.toFixed(1)}</div>
-                )}
+          {/* Coverage — hidden for apolitical cats (cyber, science) */}
+          {item.cat !== "cyber" && item.cat !== "science" && (
+            <Section title="Coverage" accent={accent}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>BIAS DISTRIBUTION</div>
+                  <BiasMini bias={biasMedNorm} />
+                  {typeof item.biasSpread === "number" && (
+                    <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>spread: {item.biasSpread.toFixed(1)}</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>RELIABILITY · {item.sourceCount} src</div>
+                  <span style={{
+                    fontSize: 13, fontWeight: 700,
+                    color: relColor(item.rel),
+                  }}>{item.rel}%</span>
+                  {sd && (
+                    <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>
+                      wire {sd.wire || 0} · main {sd.mainstream || 0} · spec {sd.specialty || 0}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>RELIABILITY · {item.sourceCount} src</div>
-                <span style={{
-                  fontSize: 13, fontWeight: 700,
-                  color: relColor(item.rel),
-                }}>{item.rel}%</span>
-                {sd && (
-                  <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>
-                    wire {sd.wire || 0} · main {sd.mainstream || 0} · spec {sd.specialty || 0}
-                  </div>
-                )}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>LEFT / CENTER / RIGHT</div>
+                <CoverageBar coverage={coverage} accent={accent} />
               </div>
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>LEFT / CENTER / RIGHT</div>
-              <CoverageBar coverage={coverage} accent={accent} />
-            </div>
-          </Section>
+            </Section>
+          )}
 
           {established.length > 0 && (
             <Section title="Established" accent={accent} count={established.length}>
