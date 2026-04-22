@@ -77,36 +77,60 @@ const CH={world:"#ff2a6d",investments:"#05ffa1",cyber:"#00f0ff",science:"#d946ef
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
 const CAT_LABELS={world:"WORLD NEWS",investments:"ECONOMICS",cyber:"TECHNOLOGY",science:"SCIENCE"};
 const CAT_CYCLE=["world","investments","cyber","science"];
-function CategoryHeadline({cat,count=0,onClick,centered=false,empty=false}){
+function CategoryHeadline({cat,count=0,onJump,centered=false,empty=false}){
   const label=empty?"EMPTY":(CAT_LABELS[cat]||"WORLD NEWS");
   const color=empty?"#ffffff":(CH[cat]||"#00f0ff");
   const nextCat=CAT_CYCLE[(CAT_CYCLE.indexOf(cat)+1)%CAT_CYCLE.length];
+  const prevCatKey=CAT_CYCLE[(CAT_CYCLE.indexOf(cat)-1+CAT_CYCLE.length)%CAT_CYCLE.length];
   const nextColor=CH[nextCat]||"#00f0ff";
+  const prevColor=CH[prevCatKey]||"#00f0ff";
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
-  // Same slot cycles between the current-cat count (resting) and ">>" (hover).
+  // Same slot cycles between the current-cat count (resting) and ">>"/"<<" (hover).
   // Short fixed-length strings, so disable length scaling.
   const padded=String(count).padStart(2,"0");
   const chev=useScramble(padded,{duration:220,interval:16,scaleByLength:false});
-  const prevCat=useRef(cat);
+  const prevCatRef=useRef(cat);
   const prevEmpty=useRef(empty);
   const [hover,setHover]=useState(false);
+  // Ctrl while hovered flips the preview: glyph "<<" + previous-cat color,
+  // click routes backward through CAT_CYCLE instead of forward.
+  const [ctrlHeld,setCtrlHeld]=useState(false);
   useEffect(()=>{
-    if(prevCat.current!==cat||prevEmpty.current!==empty){
-      prevCat.current=cat;prevEmpty.current=empty;scrambleTo(label);
+    if(prevCatRef.current!==cat||prevEmpty.current!==empty){
+      prevCatRef.current=cat;prevEmpty.current=empty;scrambleTo(label);
     }else{snapTo(label);}
   },[cat,label,empty]);
   useEffect(()=>{
+    if(!hover){setCtrlHeld(false);return;}
+    const onDown=e=>{if(e.key==="Control")setCtrlHeld(true);};
+    const onUp=e=>{if(e.key==="Control")setCtrlHeld(false);};
+    const onBlur=()=>setCtrlHeld(false);
+    window.addEventListener("keydown",onDown);
+    window.addEventListener("keyup",onUp);
+    window.addEventListener("blur",onBlur);
+    return()=>{
+      window.removeEventListener("keydown",onDown);
+      window.removeEventListener("keyup",onUp);
+      window.removeEventListener("blur",onBlur);
+    };
+  },[hover]);
+  useEffect(()=>{
     if(empty)return;
-    chev.scrambleTo(hover?">>":padded);
-    // chev.scrambleTo identity is stable enough — only re-run on hover/count flips
+    chev.scrambleTo(hover?(ctrlHeld?"<<":">>"):padded);
+    // chev.scrambleTo identity is stable enough — only re-run on hover/ctrl/count flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[hover,padded,empty]);
-  // Count reads white at rest; hover cross-fades to next-cat color for the ">>".
-  const chevColor=hover?nextColor:"#ffffff";
+  },[hover,ctrlHeld,padded,empty]);
+  // Count reads white at rest; hover cross-fades to next/prev-cat color.
+  const chevColor=hover?(ctrlHeld?prevColor:nextColor):"#ffffff";
   return(
     <div
-      onClick={empty?undefined:()=>{scrambleTo(label);chev.scrambleTo(">>");onClick?.();}}
-      onMouseEnter={empty?undefined:()=>setHover(true)}
+      onClick={empty?undefined:e=>{
+        const back=e.ctrlKey;
+        scrambleTo(label);
+        chev.scrambleTo(back?"<<":">>");
+        onJump?.(back?-1:1);
+      }}
+      onMouseEnter={empty?undefined:e=>{setHover(true);setCtrlHeld(!!e.ctrlKey);}}
       onMouseLeave={empty?undefined:()=>setHover(false)}
       style={{
         position:"absolute",
@@ -927,11 +951,13 @@ function AppInner(){
   },[]);
 
   const CATS_ORDER=['world','investments','cyber','science'];
-  const jumpToFirst=useCallback(()=>{
+  const jumpToFirst=useCallback((dir=1)=>{
     const currentCatIdx=CATS_ORDER.indexOf(activeCat);
-    // Try categories in order, skip any that have no items in the current feed
+    // Try categories in direction order, skip any that have no items in the current feed
+    const step=dir<0?-1:1;
     for(let i=1;i<=CATS_ORDER.length;i++){
-      const nextCat=CATS_ORDER[(currentCatIdx+i)%CATS_ORDER.length];
+      const offset=step*i;
+      const nextCat=CATS_ORDER[((currentCatIdx+offset)%CATS_ORDER.length+CATS_ORDER.length)%CATS_ORDER.length];
       const target=baseFeed.find(n=>n.cat===nextCat);
       if(target){playSfx("tick");setActiveId(target.id);return;}
     }
@@ -1066,7 +1092,7 @@ function AppInner(){
       )}
 
       {/* ── CATEGORY HEADLINE ── */}
-      <CategoryHeadline cat={activeCat} count={filteredNews.filter(n=>n.cat===activeCat).length} onClick={jumpToFirst} centered={isMobile} empty={baseFeed.length===0}/>
+      <CategoryHeadline cat={activeCat} count={filteredNews.filter(n=>n.cat===activeCat).length} onJump={jumpToFirst} centered={isMobile} empty={baseFeed.length===0}/>
 
       {/* ── LIVE / HISTORY TOGGLE ── */}
       <div
