@@ -88,7 +88,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   useEffect(() => {
     if (phase !== "load") return;
     const startTime = performance.now();
-    const loadDuration = 350; // ms — matches timeout below
+    const loadDuration = 245; // ms — matches timeout below
 
     const id = window.setInterval(() => {
       const elapsed = performance.now() - startTime;
@@ -120,7 +120,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   useEffect(() => {
     if (phase !== "load") return;
     mountedRef.current = true;
-    const id = window.setTimeout(() => setPhase("reveal"), 350);
+    const id = window.setTimeout(() => setPhase("reveal"), 245);
     return () => window.clearTimeout(id);
   }, [phase]);
 
@@ -139,7 +139,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
 
     let pos = 0;
     const totalLen = ROW_LEN;
-    const tickMs = 15;
+    const tickMs = 10;
     let pct = 0;
 
     const scrambleId = window.setInterval(() => {
