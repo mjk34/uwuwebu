@@ -110,11 +110,12 @@ export function playSfx(name: SfxName): void {
       tone(4000, 4, "sine", 0.02);
       return;
     case "enter":
-      // Mechanical keystroke: crisp click + mid snap with a soft mid tail.
-      // ~110ms total; no sub layer so it reads as weight, not thump.
+      // Mechanical keystroke: crisp click + shorter snap + filtered-noise
+      // tail. Noise tail replaces the old sine body so it reads as weight
+      // without the "doink" ring. ~105ms total; no sub layer.
       noiseBurst(10, 0.1, 1800);
-      tone(580, 100, "triangle", 0.09);
-      tone(300, 80, "sine", 0.035);
+      tone(720, 45, "square", 0.07);
+      noiseBurst(95, 0.022, 600);
       return;
     case "tick":
       noiseBurst(22, 0.06, 2400);
