@@ -19,11 +19,11 @@ const DOTS_TO = SPAWN_LINE.indexOf(" ok");
 
 const BOOT_LINES: LineSpec[] = [
   { text: "$ curl -s uwuversity://uplink/handshake | jq .", pauseAfter: 0 },
-  { text: '{ "status": "ready", "node": "professor-rs:4875" }', pauseAfter: 20 },
+  { text: '{ "status": "ready", "node": "professor-rs:4875" }', pauseAfter: 25 },
   { text: "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local", pauseAfter: 0 },
-  { text: "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y", pauseAfter: 20 },
+  { text: "fingerprint: SHA256:xK9v...3nUw — accept? (y/n) y", pauseAfter: 25 },
   { text: "$ sudo ./enroll --provider=discord --scope=full", pauseAfter: 0 },
-  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 5, pauseAfter: 20 },
+  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 5, pauseAfter: 25 },
   { text: "awaiting operator >>>" },
 ];
 
@@ -131,7 +131,7 @@ export default function HackerModal({ onClose }: HackerModalProps) {
         <div className="min-h-[360px] px-7 py-6">
           <TerminalBootLines
             lines={BOOT_LINES}
-            totalMs={1000}
+            totalMs={3745}
             linePauseMs={10}
             onDone={handleDone}
             instant={hasPlayedBoot}
