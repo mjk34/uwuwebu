@@ -110,10 +110,9 @@ export function playSfx(name: SfxName): void {
       tone(4000, 4, "sine", 0.02);
       return;
     case "enter":
-      // Heavier keystroke: broader-band click + low body thump + sub tail.
-      noiseBurst(10, 0.09, 900);
-      tone(150, 70, "sine", 0.16);
-      tone(70, 110, "sine", 0.09);
+      // Mechanical keystroke: crisp click + mid snap, no low thump.
+      noiseBurst(7, 0.09, 2000);
+      tone(600, 40, "triangle", 0.08);
       return;
     case "tick":
       noiseBurst(22, 0.06, 2400);
