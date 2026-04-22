@@ -110,12 +110,11 @@ export function playSfx(name: SfxName): void {
       tone(4000, 4, "sine", 0.02);
       return;
     case "enter":
-      // Thocky keystroke: sharp housing click + very short mid punch + dry
-      // warm-noise body. Tone cuts at 30ms so it never rings (no doink);
-      // body sits in low-mid noise, not sub (no thump).
-      noiseBurst(7, 0.12, 2400);
-      tone(240, 30, "triangle", 0.1);
-      noiseBurst(80, 0.035, 400);
+      // Thocky keystroke, dry: sharp housing click + low-mid tonal punch
+      // with exp-decay gain envelope (damped before it rings). No noise
+      // tail — that read as deflating air in the previous pass.
+      noiseBurst(6, 0.12, 2800);
+      tone(200, 55, "triangle", 0.13);
       return;
     case "tick":
       noiseBurst(22, 0.06, 2400);

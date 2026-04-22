@@ -29,9 +29,9 @@ const BOOT_LINES: LineSpec[] = [
   { text: "$ curl -s uwuversity://uplink/handshake | jq .", pauseAfter: 0 },
   { text: '{ "status": "ready", "node": "professor-rs:4875" }', pauseAfter: 150, sfxAfterPause: "enter" },
   { text: "$ ssh -i ~/.uwu/id_ed25519 oracle@uwuversity.local", pauseAfter: 0 },
-  { text: FINGERPRINT_LINE, slowFrom: FP_GAP_FROM, slowTo: FP_GAP_TO, slowMult: 40, pauseAfter: 150, sfxAfterPause: "enter" },
+  { text: FINGERPRINT_LINE, slowFrom: FP_GAP_FROM, slowTo: FP_GAP_TO, slowMult: 40, pauseAfter: 150, sfxAfterPause: "enter", tailFrom: FINGERPRINT_LINE.length - 1, tailClassName: "text-accent" },
   { text: "$ sudo ./enroll --provider=discord --scope=full", pauseAfter: 0 },
-  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 14, pauseAfter: 150 },
+  { text: SPAWN_LINE, slowFrom: DOTS_FROM, slowTo: DOTS_TO, slowMult: 14, pauseAfter: 150, tailFrom: SPAWN_LINE.length - 2, tailClassName: "text-ok" },
   { text: "awaiting operator >>>", className: "text-ok" },
 ];
 

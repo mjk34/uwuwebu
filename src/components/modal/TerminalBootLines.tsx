@@ -10,6 +10,8 @@ import { playSfx, type SfxName } from "@/lib/sfx";
  *   - slowFrom/slowTo/slowMult: chars in [from, to) type at slowMult× weight
  *   - sfxAfterPause: fire this sfx once at the end of pauseAfter (pre-next-line)
  *   - className: Tailwind classes applied to this line's rendered row
+ *   - tailFrom/tailClassName: chars at absolute index >= tailFrom render in
+ *     tailClassName (e.g. color the final "ok" of a spawn line)
  */
 export type LineSpec = {
   text: string;
@@ -19,6 +21,8 @@ export type LineSpec = {
   slowMult?: number;
   sfxAfterPause?: SfxName;
   className?: string;
+  tailFrom?: number;
+  tailClassName?: string;
 };
 
 type LineInput = string | LineSpec;
@@ -204,13 +208,39 @@ export default function TerminalBootLines({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instant]);
 
+  const renderLine = (text: string, spec?: LineSpec) => {
+    const tailFrom = spec?.tailFrom;
+    const tailCls = spec?.tailClassName;
+    // Split into body + tail when the visible slice has reached tailFrom.
+    let body = text;
+    let tail = "";
+    if (tailFrom != null && tailCls && text.length > tailFrom) {
+      body = text.slice(0, tailFrom);
+      tail = text.slice(tailFrom);
+    }
+    const bodyNode = body.startsWith("$") ? (
+      <>
+        <span className="text-accent">$</span>
+        {body.slice(1)}
+      </>
+    ) : body;
+    return (
+      <>
+        {bodyNode}
+        {tail && <span className={tailCls}>{tail}</span>}
+      </>
+    );
+  };
+
   return (
     <div className="font-mono text-sm leading-6 text-fg-muted">
       {printed.map((line, i) => (
-        <div key={i} className={specs[i]?.className}>{line}</div>
+        <div key={i} className={specs[i]?.className}>{renderLine(line, specs[i])}</div>
       ))}
       {current && (
-        <div className={specs[printed.length]?.className}>{current}</div>
+        <div className={specs[printed.length]?.className}>
+          {renderLine(current, specs[printed.length])}
+        </div>
       )}
     </div>
   );
