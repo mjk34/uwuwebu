@@ -44,11 +44,11 @@ const HOUR=3600*1000,DAY=24*HOUR;
 // LIVE feed = items inside this window AND unread; everything older OR read
 // rolls into HISTORY. Pipeline retains 30 days; dashboard shows that full
 // window split between the two buckets.
-const LIVE_WINDOW=3*DAY;
+const LIVE_WINDOW=2*DAY;
 // Hard cap on cards displayed per category. Pipeline can hold dozens per
 // cat across the 30-day window; surfacing more than this overwhelms the
 // vertical carousel.
-const PER_CAT_CAP=10;
+const PER_CAT_CAP=20;
 // Active card summary is hard-capped so the expanded card height stays
 // predictable; cut at the last complete word before the limit.
 const ACTIVE_SUMMARY_MAX=170;
