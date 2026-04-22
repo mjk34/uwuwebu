@@ -51,7 +51,7 @@ const LIVE_WINDOW=2*DAY;
 const PER_CAT_CAP=20;
 // Active card summary is hard-capped so the expanded card height stays
 // predictable; cut at the last complete word before the limit.
-const ACTIVE_SUMMARY_MAX=170;
+const ACTIVE_SUMMARY_MAX=160;
 function truncateAtWord(text,max){
   if(!text||text.length<=max)return text||"";
   const slice=text.slice(0,max);
@@ -1463,7 +1463,7 @@ function AppInner(){
                       <div style={ST.expText}>{truncateAtWord(item.summary,ACTIVE_SUMMARY_MAX)}</div>
                       <div style={{...ST.foot,marginTop:10}}>
                         {item.cat!=="cyber"&&item.cat!=="science"&&<BiasBar bias={item.bias}/>}
-                        {item.cat!=="cyber"&&item.cat!=="science"&&<span style={{...ST.rel,color:item.rel>85?"#05ffa1":item.rel>70?"#f5c518":"#ff2a6d",borderColor:item.rel>85?"#05ffa133":item.rel>70?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>}
+                        {item.cat!=="cyber"&&item.cat!=="science"&&<span style={{...ST.rel,color:item.rel>70?"#05ffa1":item.rel>59?"#f5c518":"#ff2a6d",borderColor:item.rel>70?"#05ffa133":item.rel>59?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>}
                         {/* TODO(phase2-auth): bookmark + read buttons disabled until login lands. */}
                         {/*
                         {(()=>{
