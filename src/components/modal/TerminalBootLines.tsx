@@ -108,8 +108,19 @@ export default function TerminalBootLines({
     const totalDur = cursor;
 
     // Flatten char lookup for SFX decisions (every 3rd non-space char).
+    // Slow-range chars are also flagged so callers can suppress SFX on them
+    // (e.g. spawn-line dots — the slowdown reads as a UI beat, not typing).
     const flat: string[] = [];
-    for (const t of texts) for (const c of t) flat.push(c);
+    const flatSlow: boolean[] = [];
+    for (let i = 0; i < specs.length; i++) {
+      const s = specs[i];
+      const lo = s.slowFrom != null ? Math.max(0, s.slowFrom) : -1;
+      const hi = s.slowTo != null ? Math.min(s.text.length, s.slowTo) : -1;
+      for (let c = 0; c < s.text.length; c++) {
+        flat.push(s.text[c]);
+        flatSlow.push(c >= lo && c < hi);
+      }
+    }
 
     let startTs = 0;
     let raf = 0;
@@ -151,7 +162,7 @@ export default function TerminalBootLines({
       cumChars += charsInLine;
       while (sfxCursor < cumChars) {
         const ch = flat[sfxCursor];
-        if (ch !== " " && sfxCursor % 3 === 0) playSfx("type");
+        if (ch !== " " && !flatSlow[sfxCursor] && sfxCursor % 3 === 0) playSfx("type");
         sfxCursor++;
       }
 
