@@ -9,7 +9,7 @@
 //   - bias: pipeline emits Ad Fontes -42..+42; UI BiasBar expects -1..+1
 //   - rel:  pipeline emits Ad Fontes 0..64;    UI badge expects 0..100
 
-export type Cat = "world" | "investments" | "tech";
+export type Cat = "world" | "investments" | "cyber" | "science";
 
 export type PipelineArticle = {
   id: string;

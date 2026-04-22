@@ -67,15 +67,16 @@ function timeStr(ts){const d=NOW-ts;if(d<HOUR)return Math.max(1,Math.round(d/600
 const ALL_TAGS = {
   world:["WAR","POLITICS","DIPLOMACY","CLIMATE","DISASTER","SOCIETY","HEALTH","CRIME"],
   investments:["MACRO","MARKETS","CRYPTO","CORPORATE","BANKING","COMMODITIES","REALESTATE","CURRENCY"],
-  tech:["BREACH","RANSOMWARE","NATIONSTATE","EXPLOIT","MALWARE","PHISHING","INFRA","PRIVACY"],
+  cyber:["BREACH","RANSOMWARE","NATIONSTATE","EXPLOIT","MALWARE","PHISHING","INFRA","PRIVACY"],
+  science:["QUANTUM","PHYSICS","SPACE","ASTRO","CLIMATE","BIO","DISCOVERY","RESEARCH","MISSION","POLICY","INDUSTRY"],
 };
 
-const C3={world:0xff2a6d,investments:0x05ffa1,tech:0x00f0ff};
-const CH={world:"#ff2a6d",investments:"#05ffa1",tech:"#00f0ff"};
+const C3={world:0xff2a6d,investments:0x05ffa1,cyber:0x00f0ff,science:0xd946ef};
+const CH={world:"#ff2a6d",investments:"#05ffa1",cyber:"#00f0ff",science:"#d946ef"};
 
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
-const CAT_LABELS={world:"WORLD NEWS",investments:"ECONOMICS",tech:"TECHNOLOGY"};
-const CAT_CYCLE=["world","investments","tech"];
+const CAT_LABELS={world:"WORLD NEWS",investments:"ECONOMICS",cyber:"TECHNOLOGY",science:"SCIENCE"};
+const CAT_CYCLE=["world","investments","cyber","science"];
 function CategoryHeadline({cat,count=0,onClick,centered=false}){
   const label=CAT_LABELS[cat]||"WORLD NEWS";
   const color=CH[cat]||"#00f0ff";
@@ -921,7 +922,7 @@ function AppInner(){
     return()=>window.removeEventListener("resize",u);
   },[]);
 
-  const CATS_ORDER=['world','investments','tech'];
+  const CATS_ORDER=['world','investments','cyber','science'];
   const jumpToFirst=useCallback(()=>{
     const currentCatIdx=CATS_ORDER.indexOf(activeCat);
     // Try categories in order, skip any that have no items in the current feed
@@ -1343,7 +1344,7 @@ function AppInner(){
                   const nearRightEdge=Math.max(0,(cardMouse.x-0.5)*2.4); // 0 at center → 1 at right
                   const nearLeftEdge=Math.max(0,(0.5-cardMouse.x)*2.4)*0.25; // left side dampened to 25%
                   const nearEdge=nearRightEdge+nearLeftEdge;
-                  const accRgb=item.cat==='world'?'255,42,109':item.cat==='investments'?'5,255,161':'0,240,255';
+                  const accRgb=item.cat==='world'?'255,42,109':item.cat==='investments'?'5,255,161':item.cat==='science'?'217,70,239':'0,240,255';
                   return(<>
                     <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2,borderRadius:"0 10px 10px 0",
                       background:`
@@ -1431,8 +1432,8 @@ function AppInner(){
                     <div style={{paddingRight:14}}>
                       <div style={ST.expText}>{truncateAtWord(item.summary,ACTIVE_SUMMARY_MAX)}</div>
                       <div style={{...ST.foot,marginTop:10}}>
-                        {item.cat!=="tech"&&<BiasBar bias={item.bias}/>}
-                        {item.cat!=="tech"&&<span style={{...ST.rel,color:item.rel>85?"#05ffa1":item.rel>70?"#f5c518":"#ff2a6d",borderColor:item.rel>85?"#05ffa133":item.rel>70?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>}
+                        {item.cat!=="cyber"&&item.cat!=="science"&&<BiasBar bias={item.bias}/>}
+                        {item.cat!=="cyber"&&item.cat!=="science"&&<span style={{...ST.rel,color:item.rel>85?"#05ffa1":item.rel>70?"#f5c518":"#ff2a6d",borderColor:item.rel>85?"#05ffa133":item.rel>70?"#f5c51833":"#ff2a6d33"}}>{item.rel}%</span>}
                         {/* TODO(phase2-auth): bookmark + read buttons disabled until login lands. */}
                         {/*
                         {(()=>{

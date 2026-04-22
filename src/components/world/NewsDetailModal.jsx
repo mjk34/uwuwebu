@@ -196,6 +196,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
   // Accent → rgb tuple for layered glass effects (mirrors the active card).
   const accRgb = item.cat === "world" ? "255,42,109"
     : item.cat === "investments" ? "5,255,161"
+    : item.cat === "science" ? "217,70,239"
     : "0,240,255";
   const fxId = `nm-${item.id}`;
 
