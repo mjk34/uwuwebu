@@ -39,8 +39,10 @@ function biasColor(b) {
 }
 
 function relColor(r) {
-  if (r > 85) return GREEN;
-  if (r > 70) return AMBER;
+  // Ad Fontes-aligned buckets (UI %): >70 ≈ raw >45 (solid reporting),
+  // >59 ≈ raw >38 (reliable threshold), else problematic.
+  if (r > 70) return GREEN;
+  if (r > 59) return AMBER;
   return PINK;
 }
 
