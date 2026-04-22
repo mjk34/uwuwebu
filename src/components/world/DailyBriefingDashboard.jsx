@@ -77,9 +77,9 @@ const CH={world:"#ff2a6d",investments:"#05ffa1",cyber:"#00f0ff",science:"#d946ef
 /* ═══════════ CATEGORY HEADLINE ═══════════ */
 const CAT_LABELS={world:"WORLD NEWS",investments:"ECONOMICS",cyber:"TECHNOLOGY",science:"SCIENCE"};
 const CAT_CYCLE=["world","investments","cyber","science"];
-function CategoryHeadline({cat,count=0,onClick,centered=false}){
-  const label=CAT_LABELS[cat]||"WORLD NEWS";
-  const color=CH[cat]||"#00f0ff";
+function CategoryHeadline({cat,count=0,onClick,centered=false,empty=false}){
+  const label=empty?"EMPTY":(CAT_LABELS[cat]||"WORLD NEWS");
+  const color=empty?"#ffffff":(CH[cat]||"#00f0ff");
   const nextCat=CAT_CYCLE[(CAT_CYCLE.indexOf(cat)+1)%CAT_CYCLE.length];
   const nextColor=CH[nextCat]||"#00f0ff";
   const{display,scrambleTo,snapTo}=useScramble(label,{duration:260,interval:16});
@@ -88,23 +88,26 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
   const padded=String(count).padStart(2,"0");
   const chev=useScramble(padded,{duration:220,interval:16,scaleByLength:false});
   const prevCat=useRef(cat);
+  const prevEmpty=useRef(empty);
   const [hover,setHover]=useState(false);
   useEffect(()=>{
-    if(prevCat.current!==cat){prevCat.current=cat;scrambleTo(label);}
-    else{snapTo(label);}
-  },[cat,label]);
+    if(prevCat.current!==cat||prevEmpty.current!==empty){
+      prevCat.current=cat;prevEmpty.current=empty;scrambleTo(label);
+    }else{snapTo(label);}
+  },[cat,label,empty]);
   useEffect(()=>{
+    if(empty)return;
     chev.scrambleTo(hover?">>":padded);
     // chev.scrambleTo identity is stable enough — only re-run on hover/count flips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[hover,padded]);
+  },[hover,padded,empty]);
   // Count reads white at rest; hover cross-fades to next-cat color for the ">>".
   const chevColor=hover?nextColor:"#ffffff";
   return(
     <div
-      onClick={()=>{scrambleTo(label);chev.scrambleTo(">>");onClick?.();}}
-      onMouseEnter={()=>setHover(true)}
-      onMouseLeave={()=>setHover(false)}
+      onClick={empty?undefined:()=>{scrambleTo(label);chev.scrambleTo(">>");onClick?.();}}
+      onMouseEnter={empty?undefined:()=>setHover(true)}
+      onMouseLeave={empty?undefined:()=>setHover(false)}
       style={{
         position:"absolute",
         left:centered?"50%":"calc(5vw + 50px)",
@@ -114,8 +117,8 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
         fontFamily:"'JetBrains Mono',monospace",
         fontSize:"clamp(36px,5vw,68px)",fontWeight:900,
         letterSpacing:"0.12em",color,lineHeight:1,
-        zIndex:15,pointerEvents:"auto",userSelect:"none",
-        cursor:"pointer",fontVariantNumeric:"tabular-nums",
+        zIndex:15,pointerEvents:empty?"none":"auto",userSelect:"none",
+        cursor:empty?"default":"pointer",fontVariantNumeric:"tabular-nums",
         opacity:0.92,
         textShadow:`0 0 14px ${color}55, 0 0 40px ${color}33`,
         whiteSpace:"nowrap",
@@ -124,8 +127,9 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
       {display}
       {/* Resting: article count in current cat color. Hover: decrypts to ">>"
           in next cat's color (click target preview). Absolute so the label
-          stays centered — the slot hangs off the right edge either way. */}
-      <span style={{
+          stays centered — the slot hangs off the right edge either way.
+          Hidden in empty state so the EMPTY label stands alone. */}
+      {!empty&&<span style={{
         position:"absolute",
         left:"100%",
         top:0,
@@ -134,7 +138,7 @@ function CategoryHeadline({cat,count=0,onClick,centered=false}){
         textShadow:`0 0 14px ${chevColor}55, 0 0 40px ${chevColor}33`,
         transition:"color 0.18s ease, text-shadow 0.18s ease",
         pointerEvents:"none",
-      }}>{chev.display}</span>
+      }}>{chev.display}</span>}
     </div>
   );
 }
@@ -1062,7 +1066,7 @@ function AppInner(){
       )}
 
       {/* ── CATEGORY HEADLINE ── */}
-      <CategoryHeadline cat={activeCat} count={baseFeed.filter(n=>n.cat===activeCat).length} onClick={jumpToFirst} centered={isMobile}/>
+      <CategoryHeadline cat={activeCat} count={filteredNews.filter(n=>n.cat===activeCat).length} onClick={jumpToFirst} centered={isMobile} empty={baseFeed.length===0}/>
 
       {/* ── LIVE / HISTORY TOGGLE ── */}
       <div
