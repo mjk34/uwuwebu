@@ -232,7 +232,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
         }}
         onMouseLeave={() => {
           cardMouseTargetRef.current = { x: 0.5, y: 0.5 };
-          startLerp(0.09);
+          startLerp(0.05);
         }}
         style={{
           position: "relative",
