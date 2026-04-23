@@ -59,7 +59,7 @@ export default function NeofetchSplash({ onDone, instant = false }: NeofetchSpla
     >
       <pre
         aria-hidden="true"
-        className="shrink-0 whitespace-pre font-mono text-[7px] leading-[8px] text-accent/85 drop-shadow-[0_0_6px_rgba(0,240,255,0.25)]"
+        className="shrink-0 whitespace-pre font-mono text-[8px] leading-[10px] text-accent"
       >
         {KORO_ART}
       </pre>
