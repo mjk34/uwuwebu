@@ -11,12 +11,20 @@
 
 export type Cat = "world" | "investments" | "cyber" | "science";
 
+export type PipelineClaim = {
+  type: "fact" | "analysis" | "opinion" | string;
+  claim: string;
+};
+
 export type PipelineArticle = {
   id: string;
   src: string;
   srcTier: "wire" | "mainstream" | "specialty";
   srcUrl: string;
-  logoUrl: string;
+  // logoUrl is emitted by the pipeline but intentionally not typed here —
+  // it points at google.com/s2/favicons which our current CSP blocks. When
+  // the modal starts rendering source favicons, widen img-src in
+  // public/_headers and re-add the field.
   title: string;
   dateTs: number;
   readTimeSec: number;
@@ -29,6 +37,8 @@ export type PipelineArticle = {
   place: string | null;
   lat: number | null;
   lng: number | null;
+  /** Optional per-article claim breakdown surfaced in the detail modal. */
+  claims?: PipelineClaim[];
 };
 
 export type PipelineHeadline = {
@@ -166,19 +176,45 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 // and this file just sits dormant as an offline/outage backstop.
 const FALLBACK_URL = `${BASE_PATH}/news.json`;
 
-function adaptPayload(payload: PipelinePayload, source: NewsSource): NewsFeed {
+// Drop cards with mock-LLM placeholder synthesis — these can sneak in when
+// Stage 6 falls back to the mock client (no fixture for a given cluster).
+// Belt-and-suspenders so a half-failed run can't leak "Cluster synthesis
+// placeholder headline." into the UI.
+function isPlaceholder(n: NewsCard): boolean {
+  const t = (n.title || "").toLowerCase();
+  const s = (n.summary || "").toLowerCase();
+  return t.includes("placeholder") || s.includes("placeholder");
+}
+
+// Minimal shape check — verifies the top-level payload has the two fields we
+// need before we start mapping headlines. Doesn't deep-check per-headline
+// fields (those default gracefully in headlineToCard), but guards against
+// wildly malformed responses (HTML error pages, empty bodies, etc).
+function isPipelinePayload(x: unknown): x is PipelinePayload {
+  if (typeof x !== "object" || x === null) return false;
+  const p = x as Partial<PipelinePayload>;
+  return typeof p.generatedAt === "number" && Array.isArray(p.headlines);
+}
+
+function adaptPayload(payload: unknown, source: NewsSource): NewsFeed {
+  if (!isPipelinePayload(payload)) {
+    throw new Error("news payload failed shape check (expected { generatedAt: number, headlines: [] })");
+  }
   return {
     generatedAt: payload.generatedAt,
-    cards: payload.headlines.map(headlineToCard),
+    cards: payload.headlines.map(headlineToCard).filter(c => !isPlaceholder(c)),
     source,
   };
 }
 
 export async function fetchNews(): Promise<NewsFeed> {
-  if (R2_NEWS_URL) {
+  // Only fetch the configured R2 URL if it's explicitly https:// — guards
+  // against a misconfigured/tampered env var pointing at http:// or a
+  // non-web scheme. Build-time surface only, but the check is free.
+  if (R2_NEWS_URL && /^https:\/\//i.test(R2_NEWS_URL)) {
     try {
       const res = await fetch(R2_NEWS_URL, { cache: "no-store" });
-      if (res.ok) return adaptPayload((await res.json()) as PipelinePayload, "live");
+      if (res.ok) return adaptPayload(await res.json(), "live");
       console.warn(`[news] R2 returned ${res.status}; using bundled fallback`);
     } catch (err) {
       console.warn("[news] R2 fetch failed; using bundled fallback", err);
@@ -186,5 +222,5 @@ export async function fetchNews(): Promise<NewsFeed> {
   }
   const res = await fetch(FALLBACK_URL, { cache: "no-store" });
   if (!res.ok) throw new Error(`news fallback fetch failed: ${res.status}`);
-  return adaptPayload((await res.json()) as PipelinePayload, "fallback");
+  return adaptPayload(await res.json(), "fallback");
 }
