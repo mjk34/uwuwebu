@@ -58,6 +58,19 @@ body {
   50% { opacity: 0.55; box-shadow: 0 0 12px rgba(5,255,161,0.95); }
 }
 
+/* World dashboard — moved from the inline <style> block in DailyBriefingDashboard
+   so we can drop the @import url('fonts.googleapis.com/...JetBrains+Mono') that
+   was render-blocking and CSP-violating. Font itself is loaded via next/font
+   (see app/layout.tsx → --font-jetbrains-mono). */
+@keyframes meshPulse {
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 0.78; }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
