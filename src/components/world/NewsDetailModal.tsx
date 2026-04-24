@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { NewsCard, Narrative, CoverageBreakdown } from "@/lib/news";
+
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+const HTTP_URL_RE = /^https?:\/\//i;
 
 /* In-theme detail modal for a single headline cluster. Surfaces the rich
    pipeline fields the card layout doesn't have room for: framing, established
@@ -18,7 +22,7 @@ const MUTED = "#858eaa";
 const TEXT = "#d4d7e0";
 const TITLE = "#f0f1f5";
 
-function timeStr(ts) {
+function timeStr(ts: number): string {
   const d = Date.now() - ts;
   const HOUR = 3600 * 1000, DAY = 24 * HOUR;
   if (d < HOUR) return Math.max(1, Math.round(d / 60000)) + "m";
@@ -26,19 +30,19 @@ function timeStr(ts) {
   return Math.round(d / DAY) + "d";
 }
 
-function tierLabel(tier) {
+function tierLabel(tier: string | undefined): string {
   if (tier === "wire") return "WIRE";
   if (tier === "specialty") return "SPEC";
   return "MAIN";
 }
 
-function biasColor(b) {
+function biasColor(b: number): string {
   if (b < -0.15) return CYAN;
   if (b > 0.15) return PINK;
   return "#ffffff";
 }
 
-function relColor(r) {
+function relColor(r: number): string {
   // Ad Fontes-aligned buckets (UI %): >70 ≈ raw >45 (solid reporting),
   // >59 ≈ raw >38 (reliable threshold), else problematic.
   if (r > 70) return GREEN;
@@ -46,19 +50,26 @@ function relColor(r) {
   return PINK;
 }
 
-function biasFromRaw(raw) {
+function biasFromRaw(raw: number | undefined | null): number {
   // pipeline -42..+42 → UI -1..+1
   if (typeof raw !== "number") return 0;
   return Math.max(-1, Math.min(1, raw / 42));
 }
 
-function relFromRaw(raw) {
+function relFromRaw(raw: number | undefined | null): number {
   // pipeline 0..64 → UI 0..100
   if (typeof raw !== "number") return 0;
   return Math.round(Math.max(0, Math.min(100, (raw / 64) * 100)));
 }
 
-function Section({ title, accent, children, count }) {
+type SectionProps = {
+  title: string;
+  accent: string;
+  children: React.ReactNode;
+  count?: number;
+};
+
+function Section({ title, accent, children, count }: SectionProps) {
   return (
     <section style={{ marginTop: 22 }}>
       <header style={{
@@ -71,12 +82,12 @@ function Section({ title, accent, children, count }) {
         }} />
         <h3 style={{
           margin: 0, fontSize: 11, letterSpacing: 2.4, fontWeight: 700,
-          color: accent, fontFamily: "'JetBrains Mono',monospace",
+          color: accent, fontFamily: "var(--font-jetbrains-mono),monospace",
           textTransform: "uppercase",
         }}>{title}</h3>
         {typeof count === "number" && (
           <span style={{
-            fontSize: 10, color: MUTED, fontFamily: "'JetBrains Mono',monospace",
+            fontSize: 10, color: MUTED, fontFamily: "var(--font-jetbrains-mono),monospace",
             letterSpacing: 1,
           }}>{count}</span>
         )}
@@ -86,11 +97,11 @@ function Section({ title, accent, children, count }) {
   );
 }
 
-function CoverageBar({ coverage, accent }) {
+function CoverageBar({ coverage }: { coverage?: CoverageBreakdown }) {
   if (!coverage) return null;
   const total = (coverage.left || 0) + (coverage.center || 0) + (coverage.right || 0);
   if (total === 0) return null;
-  const pct = (n) => `${(n / total) * 100}%`;
+  const pct = (n: number) => `${(n / total) * 100}%`;
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -103,7 +114,7 @@ function CoverageBar({ coverage, accent }) {
       </div>
       <div style={{
         display: "grid", gridTemplateColumns: "1fr 1fr 1fr", marginTop: 6,
-        fontSize: 11, fontFamily: "'JetBrains Mono',monospace",
+        fontSize: 11, fontFamily: "var(--font-jetbrains-mono),monospace",
         color: MUTED, letterSpacing: 1,
       }}>
         <span style={{ textAlign: "left" }}><span style={{ color: CYAN }}>L</span> {coverage.left || 0}</span>
@@ -114,11 +125,11 @@ function CoverageBar({ coverage, accent }) {
   );
 }
 
-function BiasMini({ bias }) {
+function BiasMini({ bias }: { bias: number }) {
   const pct = Math.round(((bias + 1) / 2) * 100);
   const c = biasColor(bias);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'JetBrains Mono',monospace" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-jetbrains-mono),monospace" }}>
       <div style={{ position: "relative", width: 50, height: 3, background: "rgba(133,142,170,0.15)", borderRadius: 2 }}>
         <div style={{
           position: "absolute", top: -2, width: 6, height: 7,
@@ -131,46 +142,111 @@ function BiasMini({ bias }) {
   );
 }
 
-export default function NewsDetailModal({ item, onClose, accent }) {
+type NewsDetailModalProps = {
+  item: NewsCard | null;
+  onClose: () => void;
+  accent?: string;
+};
+
+export default function NewsDetailModal({ item, onClose, accent: accentProp }: NewsDetailModalProps) {
+  // Accent is interpolated into inline <style> and dozens of template strings.
+  // Validate as 6-digit hex so a malformed/user-sourced prop can't break out of
+  // CSS context (the `${accent}55` 8-digit-hex alpha pattern also requires it).
+  const accent: string = accentProp && HEX_COLOR_RE.test(accentProp) ? accentProp : "#00f0ff";
   const [show, setShow] = useState(false);
-  const [expandedSrc, setExpandedSrc] = useState(null);
-  // Mirrors the active card's mouse-tracking glass FX. cardMouse holds the
-  // smoothed cursor position (0..1 within the modal); a target ref + RAF lerp
-  // keeps the visual lag identical to the card so the two surfaces feel related.
-  const [cardMouse, setCardMouse] = useState({ x: 0.5, y: 0.5 });
-  const cardMouseTargetRef = useRef({ x: 0.5, y: 0.5 });
-  const lerpRafRef = useRef(null);
-  const startLerp = useCallback((speed = 0.09) => {
+  const [expandedSrc, setExpandedSrc] = useState<number | null>(null);
+
+  // Glass FX: pointer position drives gradients/shadows via CSS custom
+  // properties written to the card element directly — avoids a React
+  // re-render every rAF tick. Lerp matches the active card so the two
+  // surfaces feel linked.
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const cardRectRef = useRef<DOMRect | null>(null);
+  const cardMouseTargetRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
+  const cardMouseCurrentRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
+  const lerpRafRef = useRef<number | null>(null);
+
+  const [reducedMotion, setReducedMotion] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+  const reducedMotionRef = useRef(reducedMotion);
+  useEffect(() => { reducedMotionRef.current = reducedMotion; }, [reducedMotion]);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const writeFxVars = (x: number, y: number) => {
+    const el = cardRef.current;
+    if (!el) return;
+    const nearRightEdge = Math.max(0, (x - 0.5) * 2.4);
+    const nearLeftEdge = Math.max(0, (0.5 - x) * 2.4) * 0.25;
+    const nearEdge = nearRightEdge + nearLeftEdge;
+    el.style.setProperty("--mx", String(x));
+    el.style.setProperty("--my", String(y));
+    el.style.setProperty("--near-right-edge", String(nearRightEdge));
+    el.style.setProperty("--near-edge", String(nearEdge));
+  };
+
+  const startLerp = (speed = 0.09) => {
+    if (reducedMotionRef.current) {
+      const { x, y } = cardMouseTargetRef.current;
+      cardMouseCurrentRef.current = { x, y };
+      writeFxVars(x, y);
+      return;
+    }
     if (lerpRafRef.current) cancelAnimationFrame(lerpRafRef.current);
     const tick = () => {
-      setCardMouse(c => {
-        const { x: tx, y: ty } = cardMouseTargetRef.current;
-        const dx = tx - c.x, dy = ty - c.y;
-        if (Math.abs(dx) < 0.003 && Math.abs(dy) < 0.003) {
-          lerpRafRef.current = null;
-          return { x: tx, y: ty };
-        }
-        lerpRafRef.current = requestAnimationFrame(tick);
-        return { x: c.x + dx * speed, y: c.y + dy * speed };
-      });
+      const { x: tx, y: ty } = cardMouseTargetRef.current;
+      const cur = cardMouseCurrentRef.current;
+      const dx = tx - cur.x, dy = ty - cur.y;
+      if (Math.abs(dx) < 0.003 && Math.abs(dy) < 0.003) {
+        cardMouseCurrentRef.current = { x: tx, y: ty };
+        writeFxVars(tx, ty);
+        lerpRafRef.current = null;
+        return;
+      }
+      const nx = cur.x + dx * speed;
+      const ny = cur.y + dy * speed;
+      cardMouseCurrentRef.current = { x: nx, y: ny };
+      writeFxVars(nx, ny);
+      lerpRafRef.current = requestAnimationFrame(tick);
     };
     lerpRafRef.current = requestAnimationFrame(tick);
-  }, []);
+  };
+
   useEffect(() => () => {
     if (lerpRafRef.current) cancelAnimationFrame(lerpRafRef.current);
   }, []);
 
-  // Slide/fade in on mount, slide/fade out on unmount via portaled show flag
+  // Slide/fade in on mount, re-trigger when switching to a new item without
+  // unmounting. Double-rAF ensures the `show=false` paint commits before we
+  // flip to true, so the CSS transition re-plays for the new cluster.
+  // Synchronous setState here is intentional — reset local state when the
+  // parent clears/switches the item.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!item) { setShow(false); setExpandedSrc(null); return; }
-    const t = requestAnimationFrame(() => setShow(true));
-    return () => cancelAnimationFrame(t);
+    if (reducedMotionRef.current) { setShow(true); return; }
+    setShow(false);
+    let r2 = 0;
+    const r1 = requestAnimationFrame(() => {
+      r2 = requestAnimationFrame(() => setShow(true));
+    });
+    return () => {
+      cancelAnimationFrame(r1);
+      if (r2) cancelAnimationFrame(r2);
+    };
   }, [item]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ESC to close
   useEffect(() => {
     if (!item) return;
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [item, onClose]);
@@ -181,6 +257,60 @@ export default function NewsDetailModal({ item, onClose, accent }) {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
+  }, [item]);
+
+  // Cache card bounding rect — pointer handlers fire every move, so reading
+  // getBoundingClientRect inline forced a synchronous layout per event.
+  useEffect(() => {
+    if (!item) return;
+    const updateRect = () => {
+      if (cardRef.current) {
+        cardRectRef.current = cardRef.current.getBoundingClientRect();
+      }
+    };
+    updateRect();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateRect) : null;
+    if (ro && cardRef.current) ro.observe(cardRef.current);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [item]);
+
+  // Focus trap: move focus into the dialog on open, restore on close, wrap
+  // Tab at boundaries. Keeps keyboard users inside the modal.
+  useEffect(() => {
+    if (!item) return;
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const trap = cardRef.current;
+    if (!trap) return;
+    const getFocusables = () => Array.from(
+      trap.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+    );
+    const initial = getFocusables();
+    (initial[0] || trap).focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const f = getFocusables();
+      if (f.length === 0) { e.preventDefault(); return; }
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    trap.addEventListener("keydown", onKey);
+    return () => {
+      trap.removeEventListener("keydown", onKey);
+      if (prevFocus && typeof prevFocus.focus === "function") {
+        prevFocus.focus({ preventScroll: true });
+      }
+    };
   }, [item]);
 
   if (!item) return null;
@@ -198,6 +328,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
   const accRgb = item.cat === "world" ? "255,42,109"
     : item.cat === "investments" ? "5,255,161"
     : item.cat === "science" ? "217,70,239"
+    : item.cat === "cyber" ? "0,240,255"
     : "0,240,255";
   const fxId = `nm-${item.id}`;
 
@@ -215,24 +346,30 @@ export default function NewsDetailModal({ item, onClose, accent }) {
       }}
     >
       <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${fxId}-title`}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        onMouseEnter={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
+        onPointerEnter={(e) => {
+          const rect = cardRectRef.current || e.currentTarget.getBoundingClientRect();
           cardMouseTargetRef.current = {
-            x: (e.clientX - r.left) / r.width,
-            y: (e.clientY - r.top) / r.height,
+            x: (e.clientX - rect.left) / rect.width,
+            y: (e.clientY - rect.top) / rect.height,
           };
           startLerp(0.09);
         }}
-        onMouseMove={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
+        onPointerMove={(e) => {
+          const rect = cardRectRef.current;
+          if (!rect) return;
           cardMouseTargetRef.current = {
-            x: (e.clientX - r.left) / r.width,
-            y: (e.clientY - r.top) / r.height,
+            x: (e.clientX - rect.left) / rect.width,
+            y: (e.clientY - rect.top) / rect.height,
           };
           if (!lerpRafRef.current) startLerp(0.18);
         }}
-        onMouseLeave={() => {
+        onPointerLeave={() => {
           cardMouseTargetRef.current = { x: 0.5, y: 0.5 };
           startLerp(0.05);
         }}
@@ -248,8 +385,9 @@ export default function NewsDetailModal({ item, onClose, accent }) {
           boxShadow: `0 30px 80px rgba(0,0,0,0.6), 0 0 60px ${accent}22, inset 0 0 0 0.5px ${accent}22`,
           opacity: show ? 1 : 0,
           transform: show ? "translateY(0) scale(1)" : "translateY(8px) scale(0.985)",
-          transition: "opacity 0.28s ease, transform 0.28s cubic-bezier(0.22,1,0.36,1)",
-          fontFamily: "'JetBrains Mono',monospace",
+          transition: reducedMotion ? "none" : "opacity 0.28s ease, transform 0.28s cubic-bezier(0.22,1,0.36,1)",
+          fontFamily: "var(--font-jetbrains-mono),monospace",
+          outline: "none",
         }}
       >
         {/* ── Card-style glass FX layers ─────────────────────────────────
@@ -279,59 +417,41 @@ export default function NewsDetailModal({ item, onClose, accent }) {
           background: "rgba(8,10,20,0.38)",
         }} />
 
-        {/* Layer 2: flowing color refraction — gradient anchors track cursor
-            through turbulence so the dot palette swims as the user moves. */}
+        {/* Layer 2: flowing color refraction — gradient anchors track pointer
+            through turbulence so the dot palette swims as the user moves.
+            Positions are driven by --mx/--my custom properties written via
+            ref in writeFxVars; no React re-render per frame. */}
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1,
           borderRadius: "0 10px 10px 0",
-          background: `
-            radial-gradient(ellipse 130% 70% at ${-10 + cardMouse.x * 55}% ${15 + cardMouse.y * 55}%, rgba(255,42,109,0.18) 0%, transparent 55%),
-            radial-gradient(ellipse 110% 80% at ${55 + cardMouse.x * 50}% ${cardMouse.y * 75}%, rgba(0,240,255,0.15) 0%, transparent 50%),
-            radial-gradient(ellipse 90% 100% at ${30 + cardMouse.x * 35}% ${85 - cardMouse.y * 45}%, rgba(5,255,161,0.10) 0%, transparent 45%)
-          `,
-          filter: `url(#liq-${fxId})`,
+          background: "radial-gradient(ellipse 130% 70% at calc(-10% + var(--mx, 0.5) * 55%) calc(15% + var(--my, 0.5) * 55%), rgba(255,42,109,0.18) 0%, transparent 55%), radial-gradient(ellipse 110% 80% at calc(55% + var(--mx, 0.5) * 50%) calc(var(--my, 0.5) * 75%), rgba(0,240,255,0.15) 0%, transparent 50%), radial-gradient(ellipse 90% 100% at calc(30% + var(--mx, 0.5) * 35%) calc(85% - var(--my, 0.5) * 45%), rgba(5,255,161,0.10) 0%, transparent 45%)",
+          filter: reducedMotion ? "none" : `url(#liq-${fxId})`,
           WebkitMaskImage: "linear-gradient(to bottom,transparent 0%,black 10%,black 90%,transparent 100%)",
           maskImage: "linear-gradient(to bottom,transparent 0%,black 10%,black 90%,transparent 100%)",
           mixBlendMode: "screen",
         }} />
 
-        {/* Layer 3: mouse-following specular — white at center, hue shifts to
-            accent near edges; right-edge halo bleeds toward the scrollbar. */}
-        {(() => {
-          const nearRightEdge = Math.max(0, (cardMouse.x - 0.5) * 2.4);
-          const nearLeftEdge = Math.max(0, (0.5 - cardMouse.x) * 2.4) * 0.25;
-          const nearEdge = nearRightEdge + nearLeftEdge;
-          return (
-            <>
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
-                borderRadius: "0 10px 10px 0",
-                background: `
-                  radial-gradient(ellipse 50% 42% at ${cardMouse.x * 100}% ${cardMouse.y * 100}%,
-                    rgba(255,255,255,${+(0.11 * (1 - nearEdge)).toFixed(3)}) 0%,
-                    rgba(255,255,255,${+(0.025 * (1 - nearEdge)).toFixed(3)}) 50%,
-                    transparent 72%),
-                  radial-gradient(ellipse 55% 48% at ${cardMouse.x * 100}% ${cardMouse.y * 100}%,
-                    rgba(${accRgb},${+(nearEdge * 0.5).toFixed(3)}) 0%,
-                    rgba(${accRgb},${+(nearEdge * 0.14).toFixed(3)}) 38%,
-                    transparent 65%)`,
-              }} />
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3,
-                borderRadius: "0 10px 10px 0",
-                boxShadow: `inset ${(cardMouse.x - 0.5) * 14}px ${(cardMouse.y - 0.5) * 14}px 40px rgba(${accRgb},${+(0.03 + nearEdge * 0.09).toFixed(3)}), inset 0 0 0 0.5px rgba(${accRgb},${+(0.03 + cardMouse.x * 0.1 + nearEdge * 0.12).toFixed(3)})`,
-              }} />
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
-                borderRadius: "0 10px 10px 0",
-                background: `radial-gradient(ellipse 35% 85% at 100% 50%, rgba(${accRgb},${+(nearRightEdge * 0.28).toFixed(3)}) 0%, rgba(${accRgb},${+(nearRightEdge * 0.08).toFixed(3)}) 45%, transparent 70%)`,
-                WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
-                maskImage: "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
-                mixBlendMode: "screen",
-              }} />
-            </>
-          );
-        })()}
+        {/* Layer 3: pointer-following specular — white at center, hue shifts
+            to accent near edges; right-edge halo bleeds toward the scrollbar.
+            Driven by --mx/--my/--near-edge/--near-right-edge custom props. */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
+          borderRadius: "0 10px 10px 0",
+          background: `radial-gradient(ellipse 50% 42% at calc(var(--mx, 0.5) * 100%) calc(var(--my, 0.5) * 100%), rgba(255,255,255, calc(0.11 * (1 - var(--near-edge, 0)))) 0%, rgba(255,255,255, calc(0.025 * (1 - var(--near-edge, 0)))) 50%, transparent 72%), radial-gradient(ellipse 55% 48% at calc(var(--mx, 0.5) * 100%) calc(var(--my, 0.5) * 100%), rgba(${accRgb}, calc(var(--near-edge, 0) * 0.5)) 0%, rgba(${accRgb}, calc(var(--near-edge, 0) * 0.14)) 38%, transparent 65%)`,
+        }} />
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 3,
+          borderRadius: "0 10px 10px 0",
+          boxShadow: `inset calc((var(--mx, 0.5) - 0.5) * 14px) calc((var(--my, 0.5) - 0.5) * 14px) 40px rgba(${accRgb}, calc(0.03 + var(--near-edge, 0) * 0.09)), inset 0 0 0 0.5px rgba(${accRgb}, calc(0.03 + var(--mx, 0.5) * 0.1 + var(--near-edge, 0) * 0.12))`,
+        }} />
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
+          borderRadius: "0 10px 10px 0",
+          background: `radial-gradient(ellipse 35% 85% at 100% 50%, rgba(${accRgb}, calc(var(--near-right-edge, 0) * 0.28)) 0%, rgba(${accRgb}, calc(var(--near-right-edge, 0) * 0.08)) 45%, transparent 70%)`,
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
+          maskImage: "linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%)",
+          mixBlendMode: "screen",
+        }} />
 
         {/* Header */}
         <header style={{
@@ -376,13 +496,13 @@ export default function NewsDetailModal({ item, onClose, accent }) {
               onMouseEnter={(e) => { e.currentTarget.style.background = accent; e.currentTarget.style.borderColor = accent; e.currentTarget.style.color = "#0a0b12"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = `${accent}55`; e.currentTarget.style.color = accent; }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
-          <h2 style={{
+          <h2 id={`${fxId}-title`} style={{
             margin: 0, fontSize: 22, lineHeight: 1.32, color: TITLE,
             fontWeight: 700, letterSpacing: 0.3,
           }}>{item.title}</h2>
@@ -400,16 +520,18 @@ export default function NewsDetailModal({ item, onClose, accent }) {
         </header>
 
         {/* Body — custom scrollbar styled in accent color via injected CSS
-            (pseudo-elements can't live in inline styles). */}
+            (pseudo-elements can't live in inline styles). Class is scoped to
+            the modal instance so simultaneously-mounted modals with different
+            accents don't stomp each other's scrollbar color. */}
         <style>{`
-          .news-modal-scroll{scrollbar-width:thin;scrollbar-color:${accent} transparent;}
-          .news-modal-scroll::-webkit-scrollbar{width:9px;}
-          .news-modal-scroll::-webkit-scrollbar-track{background:transparent;margin:4px 0;}
-          .news-modal-scroll::-webkit-scrollbar-thumb{background:${accent};border-radius:5px;}
-          .news-modal-scroll::-webkit-scrollbar-thumb:hover{background:${accent};}
-          .news-modal-scroll::-webkit-scrollbar-corner{background:transparent;}
+          .news-modal-scroll-${fxId}{scrollbar-width:thin;scrollbar-color:${accent} transparent;overscroll-behavior:contain;}
+          .news-modal-scroll-${fxId}::-webkit-scrollbar{width:9px;}
+          .news-modal-scroll-${fxId}::-webkit-scrollbar-track{background:transparent;margin:4px 0;}
+          .news-modal-scroll-${fxId}::-webkit-scrollbar-thumb{background:${accent};border-radius:5px;}
+          .news-modal-scroll-${fxId}::-webkit-scrollbar-thumb:hover{background:${accent};}
+          .news-modal-scroll-${fxId}::-webkit-scrollbar-corner{background:transparent;}
         `}</style>
-        <div className="news-modal-scroll" style={{ position: "relative", zIndex: 4, flex: 1, overflow: "auto", padding: "8px 26px 26px" }}>
+        <div className={`news-modal-scroll-${fxId}`} style={{ position: "relative", zIndex: 4, flex: 1, overflow: "auto", padding: "8px 26px 26px" }}>
           {/* Framing */}
           <Section title="Framing" accent={accent}>
             <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: TEXT }}>{item.summary}</p>
@@ -441,7 +563,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
               </div>
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 10, color: MUTED, letterSpacing: 1.4, marginBottom: 6 }}>LEFT / CENTER / RIGHT</div>
-                <CoverageBar coverage={coverage} accent={accent} />
+                <CoverageBar coverage={coverage} />
               </div>
             </Section>
           )}
@@ -494,11 +616,13 @@ export default function NewsDetailModal({ item, onClose, accent }) {
           {(narratives.left || narratives.center || narratives.right) && (
             <Section title="Narrative perspectives" accent={accent}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-                {[
+                {([
                   ["LEFT", narratives.left, CYAN],
                   ["CENTER", narratives.center, "#ffffff"],
                   ["RIGHT", narratives.right, PINK],
-                ].filter(([, n]) => n && n.framing).map(([label, n, c]) => (
+                ] as Array<[string, Narrative | undefined, string]>)
+                  .filter((e): e is [string, { framing: string }, string] => !!(e[1] && e[1].framing))
+                  .map(([label, n, c]) => (
                   <div key={label} style={{
                     padding: 10, border: `1px solid ${c}33`, borderRadius: 4, borderLeft: `2px solid ${c}`,
                     background: `${c}06`,
@@ -551,7 +675,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
                           width: "100%", textAlign: "left", padding: "10px 12px",
                           background: "transparent", border: 0, color: TEXT, cursor: "pointer",
                           display: "flex", alignItems: "center", gap: 10,
-                          fontFamily: "'JetBrains Mono',monospace",
+                          fontFamily: "var(--font-jetbrains-mono),monospace",
                         }}
                       >
                         <span style={{
@@ -569,7 +693,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
                         }}>{a.title}</span>
                         <BiasMini bias={aBias} />
                         <span style={{ fontSize: 11, fontWeight: 700, color: relColor(aRel) }}>{aRel}%</span>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={accent}
+                        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={accent}
                           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                           style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }}>
                           <polyline points="6 9 12 15 18 9" />
@@ -613,7 +737,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
                               </ul>
                             </div>
                           )}
-                          {a.srcUrl && (
+                          {a.srcUrl && HTTP_URL_RE.test(a.srcUrl) && (
                             <a href={a.srcUrl} target="_blank" rel="noopener noreferrer" style={{
                               fontSize: 11, color: accent, letterSpacing: 1.2,
                               textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6,
@@ -621,7 +745,7 @@ export default function NewsDetailModal({ item, onClose, accent }) {
                               alignSelf: "flex-start",
                             }}>
                               READ ORIGINAL
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                              <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M7 17L17 7" /><polyline points="7 7 17 7 17 17" />
                               </svg>
                             </a>
@@ -640,17 +764,17 @@ export default function NewsDetailModal({ item, onClose, accent }) {
   );
 }
 
-const listStyle = {
+const listStyle: React.CSSProperties = {
   margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6,
 };
 
-const liStyle = {
+const liStyle: React.CSSProperties = {
   listStyle: "none", position: "relative",
   paddingLeft: 16,
   fontSize: 13, color: TEXT, lineHeight: 1.6,
 };
 
-function Marker({ color }) {
+function Marker({ color }: { color: string }) {
   return (
     <span style={{
       position: "absolute", left: 2, top: 8,
