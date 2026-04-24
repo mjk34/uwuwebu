@@ -1,6 +1,5 @@
 // Koro-sensei ASCII silhouette (66x31).
 
-/* eslint-disable no-irregular-whitespace */
 export const KORO_ART = [
   "                              ******                              ",
   "                        *****************                         ",

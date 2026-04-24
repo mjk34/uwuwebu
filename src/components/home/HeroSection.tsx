@@ -97,6 +97,7 @@ export default function HeroSection() {
         window.clearTimeout(enterTimerRef.current);
         enterTimerRef.current = null;
       }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHovered(false);
       snapTo(DEFAULT_TEXT);
       return;

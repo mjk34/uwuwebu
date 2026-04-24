@@ -32,7 +32,7 @@ export function writeSession(key: string, value: string): void {
   }
 }
 
-export function readLocal(key: string): string | null {
+function readLocal(key: string): string | null {
   if (!isBrowser()) return null;
   try {
     return window.localStorage.getItem(key);
@@ -41,7 +41,7 @@ export function readLocal(key: string): string | null {
   }
 }
 
-export function writeLocal(key: string, value: string): void {
+function writeLocal(key: string, value: string): void {
   if (!isBrowser()) return;
   try {
     window.localStorage.setItem(key, value);

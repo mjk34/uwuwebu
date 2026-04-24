@@ -64,8 +64,14 @@ function randomGlitchFrame(intensity: number): GlitchFrame {
 
 export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   const [phase, setPhase] = useState<Phase>("load");
-  const mountedRef = useRef(false);
   const [loadPct, setLoadPct] = useState(0);
+
+  // Stash onFinish so effects don't restart if parent re-renders with a new
+  // inline callback (would tear down the wave interval mid-reveal).
+  const onFinishRef = useRef(onFinish);
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
 
   // Middle row (resolves to UWU)
   const [midChars, setMidChars] = useState<string[]>(makeBlankChars);
@@ -119,7 +125,6 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   // Loading phase — scramble for a beat then start wave
   useEffect(() => {
     if (phase !== "load") return;
-    mountedRef.current = true;
     const id = window.setTimeout(() => setPhase("reveal"), 245);
     return () => window.clearTimeout(id);
   }, [phase]);
@@ -133,14 +138,13 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
     ).matches;
     if (reduced) {
       finished.current = true;
-      onFinish();
+      onFinishRef.current();
       return;
     }
 
     let pos = 0;
     const totalLen = ROW_LEN;
     const tickMs = 10;
-    let pct = 0;
 
     const scrambleId = window.setInterval(() => {
       // Middle row — UWU stays after wave
@@ -195,7 +199,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
     const waveId = window.setInterval(() => {
       pos += 1;
       setWavePos(pos);
-      pct = Math.min(100, 20 + Math.round((pos / (totalLen + 4)) * 80));
+      const pct = Math.min(100, 20 + Math.round((pos / (totalLen + 4)) * 80));
       setLoadPct(pct);
       if (pos > totalLen + 4) {
         window.clearInterval(waveId);
@@ -218,7 +222,7 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
       window.clearInterval(scrambleId);
       window.clearInterval(waveId);
     };
-  }, [phase, onFinish]);
+  }, [phase]);
 
   // Hold briefly, then glitch — stop decrypt sound
   useEffect(() => {
@@ -253,21 +257,24 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
   useEffect(() => {
     if (phase !== "fade") return;
     // Trigger CSS fade
-    requestAnimationFrame(() => setFadeOut(true));
+    const rafId = requestAnimationFrame(() => setFadeOut(true));
     const id = window.setTimeout(() => {
       if (finished.current) return;
       finished.current = true;
       setPhase("done");
-      onFinish();
+      onFinishRef.current();
     }, 500);
-    return () => window.clearTimeout(id);
-  }, [phase, onFinish]);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.clearTimeout(id);
+    };
+  }, [phase]);
 
   const skip = () => {
     if (finished.current) return;
     finished.current = true;
     setPhase("done");
-    onFinish();
+    onFinishRef.current();
   };
 
   if (phase === "done") return null;
@@ -309,8 +316,9 @@ export default function LiquefiedIntro({ onFinish }: LiquefiedIntroProps) {
 
   return (
     <div
-      role="presentation"
+      role="button"
       tabIndex={0}
+      aria-label="Skip intro"
       onClick={skip}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
